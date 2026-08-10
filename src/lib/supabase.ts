@@ -148,20 +148,20 @@ export async function rollDailyQuests(): Promise<PlayerStats | null> {
   }
 
   const pool = [
-    { type: "score_2000", target: 2000, label: "Faça 2000 pontos" },
-    { type: "score_5000", target: 5000, label: "Faça 5000 pontos" },
+    { type: "score_2000", target: 2000, label: "Score 2000 points" },
+    { type: "score_5000", target: 5000, label: "Score 5000 points" },
     { type: "combo_20", target: 20, label: "Combo x20" },
     { type: "combo_40", target: 40, label: "Combo x40" },
-    { type: "golden_10", target: 10, label: "Pegue 10 dourados" },
-    { type: "golden_20", target: 20, label: "Pegue 20 dourados" },
-    { type: "jackpot_1", target: 1, label: "Ganhe 1 jackpot" },
-    { type: "jackpot_3", target: 3, label: "Ganhe 3 jackpots" },
-    { type: "level_10", target: 10, label: "Alcance o nível 10" },
-    { type: "boss_1", target: 1, label: "Derrote 1 chefe" },
-    { type: "rainbow_1", target: 1, label: "Pegue 1 arco-íris" },
-    { type: "treasure_1", target: 1, label: "Abra 1 tesouro" },
-    { type: "games_3", target: 3, label: "Jogue 3 partidas" },
-    { type: "games_5", target: 5, label: "Jogue 5 partidas" },
+    { type: "golden_10", target: 10, label: "Collect 10 golden orbs" },
+    { type: "golden_20", target: 20, label: "Collect 20 golden orbs" },
+    { type: "jackpot_1", target: 1, label: "Win 1 jackpot" },
+    { type: "jackpot_3", target: 3, label: "Win 3 jackpots" },
+    { type: "level_10", target: 10, label: "Reach level 10" },
+    { type: "boss_1", target: 1, label: "Defeat 1 boss" },
+    { type: "rainbow_1", target: 1, label: "Collect 1 rainbow" },
+    { type: "treasure_1", target: 1, label: "Open 1 treasure" },
+    { type: "games_3", target: 3, label: "Play 3 games" },
+    { type: "games_5", target: 5, label: "Play 5 games" },
   ];
 
   const shuffled = [...pool].sort(() => Math.random() - 0.5);
