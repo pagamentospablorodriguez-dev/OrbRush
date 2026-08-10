@@ -514,7 +514,7 @@ function App() {
                 ))}
               </div>
               <h1 className="text-5xl font-black text-white mb-3 tracking-tight">
-                ORB<span className="text-cyan-400">RUSH</span>
+                ORBRUSH<span className="text-cyan-400">.FUN</span>
               </h1>
               {game.prestige > 0 && (
                 <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/15 border border-amber-400/30 text-amber-300 text-sm font-bold mb-3">
