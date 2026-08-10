@@ -24,20 +24,20 @@ export const QUEST_ICONS: Record<string, string> = {
 
 export function questLabel(type: string): string {
   const map: Record<string, string> = {
-    score_2000: "Faça 2000 pontos",
-    score_5000: "Faça 5000 pontos",
+    score_2000: "Score 2000 points",
+    score_5000: "Score 5000 points",
     combo_20: "Combo x20",
     combo_40: "Combo x40",
-    golden_10: "Pegue 10 dourados",
-    golden_20: "Pegue 20 dourados",
-    jackpot_1: "Ganhe 1 jackpot",
-    jackpot_3: "Ganhe 3 jackpots",
-    level_10: "Alcance o nível 10",
-    boss_1: "Derrote 1 chefe",
-    rainbow_1: "Pegue 1 arco-íris",
-    treasure_1: "Abra 1 tesouro",
-    games_3: "Jogue 3 partidas",
-    games_5: "Jogue 5 partidas",
+    golden_10: "Collect 10 golden orbs",
+    golden_20: "Collect 20 golden orbs",
+    jackpot_1: "Win 1 jackpot",
+    jackpot_3: "Win 3 jackpots",
+    level_10: "Reach level 10",
+    boss_1: "Defeat 1 boss",
+    rainbow_1: "Collect 1 rainbow",
+    treasure_1: "Open 1 treasure",
+    games_3: "Play 3 games",
+    games_5: "Play 5 games",
   };
   return map[type] ?? type;
 }
