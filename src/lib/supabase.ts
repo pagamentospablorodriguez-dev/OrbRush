@@ -194,7 +194,7 @@ export async function updateQuestProgress(
   const stats = await loadStats();
   if (!stats) return;
 
-  const updates: Partial<PlayerStats> = {};
+  const updates: Record<string, any> = {};
 
   for (const i of [1, 2, 3] as const) {
     const qType = stats[`quest${i}_type` as keyof PlayerStats] as string;
@@ -205,16 +205,16 @@ export async function updateQuestProgress(
     if (qType === type && !qDone) {
       const newProg = incremental ? qProg + value : Math.max(qProg, value);
       if (newProg >= qTarget) {
-        updates[`quest${i}_progress` as keyof PlayerStats] = qTarget;
-        updates[`quest${i}_done` as keyof PlayerStats] = true;
+        updates[`quest${i}_progress`] = qTarget;
+        updates[`quest${i}_done`] = true;
       } else {
-        updates[`quest${i}_progress` as keyof PlayerStats] = newProg;
+        updates[`quest${i}_progress`] = newProg;
       }
     }
   }
 
   if (Object.keys(updates).length > 0) {
-    await saveStats(updates);
+    await saveStats(updates as Partial<PlayerStats>);
   }
 }
 
@@ -224,7 +224,7 @@ export async function claimQuestRewards(): Promise<{ gems: number; claimed: numb
 
   let gems = 0;
   let claimed = 0;
-  const updates: Partial<PlayerStats> = {};
+  const updates: Record<string, any> = {};
 
   for (const i of [1, 2, 3] as const) {
     const done = stats[`quest${i}_done` as keyof PlayerStats] as boolean;
@@ -232,13 +232,13 @@ export async function claimQuestRewards(): Promise<{ gems: number; claimed: numb
     if (done && !type.startsWith("claimed_")) {
       gems += 50;
       claimed++;
-      updates[`quest${i}_type` as keyof PlayerStats] = `claimed_${type}`;
+      updates[`quest${i}_type`] = `claimed_${type}`;
     }
   }
 
   if (claimed > 0) {
     updates.gems = (stats.gems ?? 0) + gems;
-    await saveStats(updates);
+    await saveStats(updates as Partial<PlayerStats>);
   }
 
   return { gems, claimed };
