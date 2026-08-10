@@ -1,49 +1,25 @@
-//Bune
-
-
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Play,
-  RotateCcw,
-  Volume2,
-  VolumeX,
-  Flame,
-  Star,
-  Heart,
-  Zap,
-  Trophy,
-  Target,
-  Sparkles,
-  Crown,
-  Shield,
-  HelpCircle,
-  TrendingUp,
-  Award,
-  Link as LinkIcon,
-  Ghost,
-  Gift,
-  Snowflake,
-  Swords,
-  Rainbow,
-  Gem,
-  CheckCircle2,
-  Circle,
-  X,
-  ShoppingBag,
-  ChevronRight,
+  Play, RotateCcw, Volume2, VolumeX, Flame, Star, Heart, Zap, Trophy, Target,
+  Sparkles, Crown, Shield, HelpCircle, TrendingUp, Award, Link as LinkIcon,
+  Ghost, Gift, Snowflake, Swords, Rainbow, Gem, CheckCircle2, Circle, X,
+  ShoppingBag, ChevronRight, BookOpen, Users, AlertTriangle, Timer,
 } from "lucide-react";
 import { useParticleCanvas } from "@/lib/particles";
 import { useGame, type Orb, type Achievement, type PowerUps } from "@/lib/useGame";
-import { setMuted, isMuted } from "@/lib/sound";
+import { setMuted, isMuted, playChestTease, playChestReveal, playSocialNotification, playLossChase, playCountdown } from "@/lib/sound";
 import {
   loadStats, saveStats, updateDailyStreak, rollDailyChallenge, updateChallengeProgress,
   rollDailyQuests, updateQuestProgress, claimQuestRewards, canSpinWheel, spinWheelSave,
   buyPowerUp, clearPowerUps,
 } from "@/lib/supabase";
-import { rollChest, rarityIndex, type ChestReward, type ChestRarity } from "@/lib/chest";
+import { rollChest, rollChestWithTease, rarityIndex, type ChestReward, type ChestRarity, RARITY_ORDER } from "@/lib/chest";
 import { parseQuests, questLabel, questIcon, type QuestState } from "@/lib/quests";
 import { WHEEL_SEGMENTS, spinWheel } from "@/lib/wheel";
 import { POWER_UPS } from "@/lib/shop";
+import { getCollectionEntries, getCollectionStats, type CollectionEntry } from "@/lib/collection";
+import { rollSocialNotification, randomSocialDelay, type SocialNotification } from "@/lib/social";
+import { getLossChaseBonus, type LossChaseBonus } from "@/lib/lossChase";
 
 const ORB_COLORS: Record<string, { bg: string; border: string; glow: string }> = {
   normal: { bg: "from-cyan-400 to-blue-500", border: "border-cyan-300", glow: "shadow-cyan-400/50" },
@@ -62,11 +38,7 @@ const ORB_COLORS: Record<string, { bg: string; border: string; glow: string }> =
   treasure: { bg: "from-amber-400 to-orange-500", border: "border-amber-300", glow: "shadow-amber-400/70" },
 };
 
-const RARITY_LABEL: Record<ChestRarity, string> = {
-  common: "Comum", rare: "Raro", epic: "Épico", legendary: "Lendário", mythic: "MÍTICO",
-};
-
-type ModalType = "chest" | "wheel" | "shop" | "quests" | null;
+type ModalType = "chest" | "wheel" | "shop" | "quests" | "collection" | null;
 
 function App() {
   const { canvasRef, burst, floatText, shockwave } = useParticleCanvas();
@@ -85,6 +57,8 @@ function App() {
   const [modal, setModal] = useState<ModalType>(null);
   const [chestReward, setChestReward] = useState<ChestReward | null>(null);
   const [chestOpening, setChestOpening] = useState(false);
+  const [chestTeaseIndex, setChestTeaseIndex] = useState(-1);
+  const [chestTeaseRarities, setChestTeaseRarities] = useState<ChestRarity[]>([]);
   const [wheelSpinning, setWheelSpinning] = useState(false);
   const [wheelAngle, setWheelAngle] = useState(0);
   const [wheelResult, setWheelResult] = useState<number | null>(null);
@@ -94,14 +68,18 @@ function App() {
   const [powerUps, setPowerUps] = useState<PowerUps>({ shield: false, extra_life: false, frenzy: false, double: false, freeze: false });
   const [activePowerUps, setActivePowerUps] = useState<PowerUps>({ shield: false, extra_life: false, frenzy: false, double: false, freeze: false });
   const [buyError, setBuyError] = useState<string | null>(null);
+  const [socialNotifs, setSocialNotifs] = useState<SocialNotification[]>([]);
+  const [collectionEntries, setCollectionEntries] = useState<CollectionEntry[]>([]);
+  const [collectionStats, setCollectionStats] = useState({ discovered: 0, total: 13 });
+  const [lossChase, setLossChase] = useState<LossChaseBonus>({ active: false, multiplier: 1, secondsLeft: 0, reason: "" });
+  const [showStreakWarning, setShowStreakWarning] = useState(false);
+  const [collectionPopup, setCollectionPopup] = useState<{ label: string; icon: string } | null>(null);
   const shakeTimerRef = useRef<number | null>(null);
   const flashTimerRef = useRef<number | null>(null);
 
   const onAchievement = useCallback((a: Achievement) => {
     setAchievements((prev) => [...prev, a]);
-    setTimeout(() => {
-      setAchievements((prev) => prev.filter((x) => x.id !== a.id));
-    }, 3500);
+    setTimeout(() => setAchievements((prev) => prev.filter((x) => x.id !== a.id)), 3500);
   }, []);
 
   const onScreenShake = useCallback((intensity: number) => {
@@ -120,24 +98,117 @@ function App() {
     updateQuestProgress(type, value, incremental);
   }, []);
 
+  const onCollectionNew = useCallback((type: string, label: string, icon: string) => {
+    setCollectionPopup({ label, icon });
+    setTimeout(() => setCollectionPopup(null), 3000);
+    setCollectionEntries(getCollectionEntries());
+    setCollectionStats(getCollectionStats());
+  }, []);
+
   const game = useGame({
-    onBurst: burst,
-    onFloatText: floatText,
-    onShockwave: shockwave,
-    onAchievement,
-    onScreenShake,
-    onFlash,
-    onQuestProgress,
+    onBurst: burst, onFloatText: floatText, onShockwave: shockwave,
+    onAchievement, onScreenShake, onFlash, onQuestProgress, onCollectionNew,
   });
+
+  // Social proof notifications — fake players achieving things
+  useEffect(() => {
+    if (game.gameState === "idle") return;
+    let timer: number;
+    const schedule = () => {
+      timer = window.setTimeout(() => {
+        const notif = rollSocialNotification();
+        setSocialNotifs((prev) => [...prev.slice(-2), notif]);
+        playSocialNotification();
+        setTimeout(() => {
+          setSocialNotifs((prev) => prev.filter((n) => n.id !== notif.id));
+        }, 5000);
+        schedule();
+      }, randomSocialDelay());
+    };
+    schedule();
+    return () => clearTimeout(timer);
+  }, [game.gameState]);
+
+  // Streak FOMO warning — show when idle and has a streak to lose
+  useEffect(() => {
+    if (game.gameState === "idle" && game.dailyStreak >= 2 && !showStreakWarning) {
+      const timer = setTimeout(() => setShowStreakWarning(true), 2000);
+      return () => clearTimeout(timer);
+    }
+    if (game.gameState === "playing") setShowStreakWarning(false);
+  }, [game.gameState, game.dailyStreak, showStreakWarning]);
+
+  // Loss-chase bonus after game over
+  useEffect(() => {
+    if (game.gameState === "gameover") {
+      const bonus = getLossChaseBonus(game.sessionStreak, game.nearRecord, game.newRecord);
+      if (bonus.active) {
+        setLossChase(bonus);
+        playLossChase();
+        let countdown = bonus.secondsLeft;
+        const timer = setInterval(() => {
+          countdown--;
+          setLossChase((prev) => ({ ...prev, secondsLeft: countdown }));
+          if (countdown <= 5 && countdown > 0) playCountdown();
+          if (countdown <= 0) {
+            clearInterval(timer);
+            setLossChase({ active: false, multiplier: 1, secondsLeft: 0, reason: "" });
+          }
+        }, 1000);
+        return () => clearInterval(timer);
+      }
+    }
+  }, [game.gameState, game.sessionStreak, game.nearRecord, game.newRecord]);
+
+  // Game over save
+  useEffect(() => {
+    if (game.gameState === "gameover") {
+      const newHigh = Math.max(game.highScore, game.score);
+      const newBestCombo = Math.max(loadedStats?.bestCombo ?? 0, game.bestCombo);
+      const gemsEarned = game.gems;
+      saveStats({
+        high_score: newHigh, best_combo: newBestCombo,
+        total_taps: (loadedStats?.totalTaps ?? 0) + game.totalTaps,
+        total_golden: (loadedStats?.totalGolden ?? 0) + game.totalGolden,
+        current_level: game.level, prestige: game.prestige,
+        total_games: (loadedStats?.totalGames ?? 0) + 1,
+        total_jackpots: (loadedStats?.totalJackpots ?? 0) + game.totalJackpots,
+        daily_challenge_progress: Math.max(game.score, loadedStats?.high ?? 0),
+        gems: (loadedStats?.gems ?? 0) + gemsEarned,
+      });
+      setGems((g) => g + gemsEarned);
+      setLoadedStats((prev) => prev ? {
+        ...prev, high: newHigh, bestCombo: newBestCombo,
+        totalTaps: (prev.totalTaps ?? 0) + game.totalTaps,
+        totalGolden: (prev.totalGolden ?? 0) + game.totalGolden,
+        totalGames: (prev.totalGames ?? 0) + 1,
+        totalJackpots: (prev.totalJackpots ?? 0) + game.totalJackpots,
+        gems: (prev.gems ?? 0) + gemsEarned,
+      } : prev);
+      if (game.score > (loadedStats?.high ?? 0)) game.setHighScore(game.score);
+      clearPowerUps();
+      setActivePowerUps({ shield: false, extra_life: false, frenzy: false, double: false, freeze: false });
+      setPowerUps({ shield: false, extra_life: false, frenzy: false, double: false, freeze: false });
+      refreshQuests();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [game.gameState]);
+
+  // Challenge progress
+  useEffect(() => {
+    if (game.gameState === "playing" && game.score > 0 && game.challengeTarget > 0 && !game.challengeDone) {
+      const t = setTimeout(() => updateChallengeProgress(game.score), 1000);
+      return () => clearTimeout(t);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [game.score]);
 
   const refreshQuests = useCallback(async () => {
     const stats = await rollDailyQuests();
-    if (stats) {
-      setQuests(parseQuests(stats));
-      setGems(stats.gems ?? 0);
-    }
+    if (stats) { setQuests(parseQuests(stats)); setGems(stats.gems ?? 0); }
   }, []);
 
+  // Initial load
   useEffect(() => {
     (async () => {
       const stats = await loadStats();
@@ -150,23 +221,14 @@ function App() {
         game.setChallengeTarget(stats.daily_challenge_target);
         game.setChallengeDone(stats.daily_challenge_progress >= stats.daily_challenge_target && stats.daily_challenge_target > 0);
         setLoadedStats({
-          high: stats.high_score,
-          bestCombo: stats.best_combo,
-          streak: stats.daily_streak,
-          totalTaps: stats.total_taps,
-          totalGolden: stats.total_golden,
-          prestige: stats.prestige,
-          totalGames: stats.total_games,
-          totalJackpots: stats.total_jackpots,
-          gems: stats.gems ?? 0,
+          high: stats.high_score, bestCombo: stats.best_combo, streak: stats.daily_streak,
+          totalTaps: stats.total_taps, totalGolden: stats.total_golden, prestige: stats.prestige,
+          totalGames: stats.total_games, totalJackpots: stats.total_jackpots, gems: stats.gems ?? 0,
         });
         setGems(stats.gems ?? 0);
         setPowerUps({
-          shield: stats.power_shield,
-          extra_life: stats.power_extra_life,
-          frenzy: stats.power_frenzy,
-          double: stats.power_double,
-          freeze: stats.power_freeze,
+          shield: stats.power_shield, extra_life: stats.power_extra_life,
+          frenzy: stats.power_frenzy, double: stats.power_double, freeze: stats.power_freeze,
         });
         setQuests(parseQuests(stats));
       }
@@ -183,71 +245,17 @@ function App() {
       if (challengeResult) {
         game.setChallengeTarget(challengeResult.target);
         setChallengeInfo(challengeResult);
-        if (challengeResult.isNew) {
-          setShowChallengePopup(true);
-          setTimeout(() => setShowChallengePopup(false), 4500);
-        }
+        if (challengeResult.isNew) { setShowChallengePopup(true); setTimeout(() => setShowChallengePopup(false), 4500); }
       }
       await refreshQuests();
       setWheelAvailable(await canSpinWheel());
+      setCollectionEntries(getCollectionEntries());
+      setCollectionStats(getCollectionStats());
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    if (game.gameState === "gameover") {
-      const newHigh = Math.max(game.highScore, game.score);
-      const newBestCombo = Math.max(loadedStats?.bestCombo ?? 0, game.bestCombo);
-      const gemsEarnedThisGame = game.gems;
-      saveStats({
-        high_score: newHigh,
-        best_combo: newBestCombo,
-        total_taps: (loadedStats?.totalTaps ?? 0) + game.totalTaps,
-        total_golden: (loadedStats?.totalGolden ?? 0) + game.totalGolden,
-        current_level: game.level,
-        prestige: game.prestige,
-        total_games: (loadedStats?.totalGames ?? 0) + 1,
-        total_jackpots: (loadedStats?.totalJackpots ?? 0) + game.totalJackpots,
-        daily_challenge_progress: Math.max(game.score, loadedStats?.high ?? 0),
-        gems: (loadedStats?.gems ?? 0) + gemsEarnedThisGame,
-      });
-      setGems((g) => g + gemsEarnedThisGame);
-      setLoadedStats((prev) => prev ? {
-        ...prev,
-        high: newHigh,
-        bestCombo: newBestCombo,
-        totalTaps: (prev.totalTaps ?? 0) + game.totalTaps,
-        totalGolden: (prev.totalGolden ?? 0) + game.totalGolden,
-        totalGames: (prev.totalGames ?? 0) + 1,
-        totalJackpots: (prev.totalJackpots ?? 0) + game.totalJackpots,
-        gems: (prev.gems ?? 0) + gemsEarnedThisGame,
-      } : prev);
-      if (game.score > (loadedStats?.high ?? 0)) {
-        game.setHighScore(game.score);
-      }
-      // Clear power-ups after use
-      clearPowerUps();
-      setActivePowerUps({ shield: false, extra_life: false, frenzy: false, double: false, freeze: false });
-      setPowerUps({ shield: false, extra_life: false, frenzy: false, double: false, freeze: false });
-      // Refresh quests
-      refreshQuests();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [game.gameState]);
-
-  useEffect(() => {
-    if (game.gameState === "playing" && game.score > 0 && game.challengeTarget > 0 && !game.challengeDone) {
-      const t = setTimeout(() => updateChallengeProgress(game.score), 1000);
-      return () => clearTimeout(t);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [game.score]);
-
-  const toggleMute = () => {
-    const m = !muted;
-    setMuted(m);
-    setMutedState(m);
-  };
+  const toggleMute = () => { const m = !muted; setMuted(m); setMutedState(m); };
 
   const handleOrbTap = (orb: Orb, e: React.PointerEvent) => {
     e.stopPropagation();
@@ -255,24 +263,32 @@ function App() {
   };
 
   const handleStartGame = () => {
+    setLossChase({ active: false, multiplier: 1, secondsLeft: 0, reason: "" });
     game.startGame(activePowerUps);
   };
 
+  // Chest with near-miss tease animation
   const handleOpenChest = () => {
     setChestOpening(true);
     setChestReward(null);
-    setTimeout(() => {
-      const reward = rollChest();
-      setChestReward(reward);
-      setChestOpening(false);
-      setGems((g) => g + reward.gems);
-      saveStats({ gems: (loadedStats?.gems ?? 0) + game.gems + reward.gems, total_chests: (loadedStats?.totalGames ?? 0) });
-      const ri = rarityIndex(reward.rarity);
-      const stats = { ...loadedStats };
-      if (ri > (stats?.totalJackpots ?? 0)) {
-        saveStats({ best_rarity: ri });
+    const { reward, teaseSequence } = rollChestWithTease();
+    setChestTeaseRarities(teaseSequence);
+    let idx = 0;
+    const teaseInterval = setInterval(() => {
+      setChestTeaseIndex(idx);
+      playChestTease();
+      idx++;
+      if (idx >= teaseSequence.length) {
+        clearInterval(teaseInterval);
+        setChestOpening(false);
+        setChestReward(reward);
+        setGems((g) => g + reward.gems);
+        playChestReveal();
+        saveStats({ gems: (loadedStats?.gems ?? 0) + game.gems + reward.gems });
+        const ri = rarityIndex(reward.rarity);
+        if (ri > (loadedStats?.totalJackpots ?? 0)) saveStats({ best_rarity: ri });
       }
-    }, 1500);
+    }, 150);
   };
 
   const handleSpinWheel = () => {
@@ -305,126 +321,50 @@ function App() {
 
   const handleClaimQuests = async () => {
     const { gems: claimed, claimed: count } = await claimQuestRewards();
-    if (count > 0) {
-      setGems((g) => g + claimed);
-      refreshQuests();
-    }
+    if (count > 0) { setGems((g) => g + claimed); refreshQuests(); }
   };
 
-  const closeModal = () => {
-    setModal(null);
-    setChestReward(null);
-    setWheelResult(null);
-    setBuyError(null);
-  };
+  const closeModal = () => { setModal(null); setChestReward(null); setWheelResult(null); setBuyError(null); setChestTeaseIndex(-1); };
 
   const shakeStyle = shake > 0 ? { animation: `shake 300ms ease-out` } : undefined;
-
   const activePowerUpCount = Object.values(activePowerUps).filter(Boolean).length;
+  const lossChaseActive = lossChase.active && game.gameState === "gameover";
 
   return (
     <div className="relative w-full h-screen overflow-hidden bg-slate-950 select-none">
       <style>{`
-        @keyframes shake {
-          0%, 100% { transform: translate(0, 0); }
-          20% { transform: translate(-${shake}px, ${shake / 2}px); }
-          40% { transform: translate(${shake}px, -${shake / 2}px); }
-          60% { transform: translate(-${shake / 2}px, -${shake / 3}px); }
-          80% { transform: translate(${shake / 2}px, ${shake / 3}px); }
-        }
-        @keyframes orbPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.08); } }
-        @keyframes orbAppear {
-          0% { transform: scale(0) rotate(-180deg); opacity: 0; }
-          60% { transform: scale(1.15) rotate(10deg); opacity: 1; }
-          100% { transform: scale(1) rotate(0); opacity: 1; }
-        }
-        @keyframes slideUp { from { transform: translateY(30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-        @keyframes slideDownFade {
-          0% { transform: translateY(-20px); opacity: 0; }
-          15% { transform: translateY(0); opacity: 1; }
-          85% { transform: translateY(0); opacity: 1; }
-          100% { transform: translateY(-20px); opacity: 0; }
-        }
-        @keyframes pulseGlow {
-          0%, 100% { box-shadow: 0 0 20px 5px rgba(251,191,36,0.3); }
-          50% { box-shadow: 0 0 40px 15px rgba(251,191,36,0.6); }
-        }
-        @keyframes scoreBump { 0% { transform: scale(1); } 50% { transform: scale(1.15); } 100% { transform: scale(1); } }
-        @keyframes heartBeat { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.2); } }
-        @keyframes frenzyBg {
-          0%, 100% { background: radial-gradient(circle at 50% 50%, rgba(251,146,60,0.15), transparent 70%); }
-          50% { background: radial-gradient(circle at 50% 50%, rgba(251,146,60,0.3), transparent 70%); }
-        }
-        @keyframes comebackBg {
-          0%, 100% { background: radial-gradient(circle at 50% 50%, rgba(34,197,94,0.12), transparent 70%); }
-          50% { background: radial-gradient(circle at 50% 50%, rgba(34,197,94,0.25), transparent 70%); }
-        }
-        @keyframes freezeBg {
-          0%, 100% { background: radial-gradient(circle at 50% 50%, rgba(125,211,252,0.12), transparent 70%); }
-          50% { background: radial-gradient(circle at 50% 50%, rgba(125,211,252,0.25), transparent 70%); }
-        }
-        @keyframes luckyBg {
-          0%, 100% { background: radial-gradient(circle at 50% 50%, rgba(251,191,36,0.15), transparent 70%); }
-          50% { background: radial-gradient(circle at 50% 50%, rgba(251,191,36,0.35), transparent 70%); }
-        }
-        @keyframes doubleBg {
-          0%, 100% { background: radial-gradient(circle at 50% 50%, rgba(168,85,247,0.12), transparent 70%); }
-          50% { background: radial-gradient(circle at 50% 50%, rgba(168,85,247,0.25), transparent 70%); }
-        }
-        @keyframes dangerPulse {
-          0%, 100% { box-shadow: inset 0 0 60px rgba(239,68,68,0.15); }
-          50% { box-shadow: inset 0 0 100px rgba(239,68,68,0.3); }
-        }
-        @keyframes mysterySpin { 0% { transform: rotate(0); } 100% { transform: rotate(360deg); } }
-        @keyframes shieldRing {
-          0%, 100% { box-shadow: 0 0 15px 3px rgba(59,130,246,0.4); }
-          50% { box-shadow: 0 0 25px 8px rgba(59,130,246,0.7); }
-        }
-        @keyframes rainbowShift {
-          0% { filter: hue-rotate(0deg); }
-          100% { filter: hue-rotate(360deg); }
-        }
-        @keyframes bossShake {
-          0%, 100% { transform: translate(-50%, -50%) rotate(0); }
-          25% { transform: translate(-52%, -48%) rotate(-3deg); }
-          75% { transform: translate(-48%, -52%) rotate(3deg); }
-        }
-        @keyframes chestShake {
-          0%, 100% { transform: rotate(0) scale(1); }
-          25% { transform: rotate(-5deg) scale(1.05); }
-          75% { transform: rotate(5deg) scale(1.05); }
-        }
-        @keyframes chestBurst {
-          0% { transform: scale(1); }
-          50% { transform: scale(1.3); }
-          100% { transform: scale(1); }
-        }
-        @keyframes modalIn {
-          0% { transform: scale(0.8); opacity: 0; }
-          100% { transform: scale(1); opacity: 1; }
-        }
-        @keyframes countdownPulse {
-          0%, 100% { transform: scale(1); opacity: 1; }
-          50% { transform: scale(1.2); opacity: 0.7; }
-        }
-        @keyframes adrenalineBg {
-          0%, 100% { background: radial-gradient(circle at 50% 50%, rgba(239,68,68,0.1), transparent 60%); }
-          50% { background: radial-gradient(circle at 50% 50%, rgba(239,68,68,0.25), transparent 60%); }
-        }
-        @keyframes nudgeShake {
-          0%, 100% { transform: translateX(0); }
-          25% { transform: translateX(-3px); }
-          75% { transform: translateX(3px); }
-        }
-        @keyframes firstWinPop {
-          0% { transform: scale(0) rotate(-10deg); opacity: 0; }
-          60% { transform: scale(1.2) rotate(5deg); opacity: 1; }
-          100% { transform: scale(1) rotate(0); opacity: 1; }
-        }
+        @keyframes shake { 0%,100%{transform:translate(0,0)} 20%{transform:translate(-${shake}px,${shake/2}px)} 40%{transform:translate(${shake}px,-${shake/2}px)} 60%{transform:translate(-${shake/2}px,-${shake/3}px)} 80%{transform:translate(${shake/2}px,${shake/3}px)} }
+        @keyframes orbPulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.08)} }
+        @keyframes orbAppear { 0%{transform:scale(0) rotate(-180deg);opacity:0} 60%{transform:scale(1.15) rotate(10deg);opacity:1} 100%{transform:scale(1) rotate(0);opacity:1} }
+        @keyframes slideUp { from{transform:translateY(30px);opacity:0} to{transform:translateY(0);opacity:1} }
+        @keyframes slideDownFade { 0%{transform:translateY(-20px);opacity:0} 15%{transform:translateY(0);opacity:1} 85%{transform:translateY(0);opacity:1} 100%{transform:translateY(-20px);opacity:0} }
+        @keyframes slideInLeft { 0%{transform:translateX(-100%);opacity:0} 15%{transform:translateX(0);opacity:1} 85%{transform:translateX(0);opacity:1} 100%{transform:translateX(-100%);opacity:0} }
+        @keyframes pulseGlow { 0%,100%{box-shadow:0 0 20px 5px rgba(251,191,36,0.3)} 50%{box-shadow:0 0 40px 15px rgba(251,191,36,0.6)} }
+        @keyframes scoreBump { 0%{transform:scale(1)} 50%{transform:scale(1.15)} 100%{transform:scale(1)} }
+        @keyframes heartBeat { 0%,100%{transform:scale(1)} 50%{transform:scale(1.2)} }
+        @keyframes frenzyBg { 0%,100%{background:radial-gradient(circle at 50% 50%,rgba(251,146,60,0.15),transparent 70%)} 50%{background:radial-gradient(circle at 50% 50%,rgba(251,146,60,0.3),transparent 70%)} }
+        @keyframes comebackBg { 0%,100%{background:radial-gradient(circle at 50% 50%,rgba(34,197,94,0.12),transparent 70%)} 50%{background:radial-gradient(circle at 50% 50%,rgba(34,197,94,0.25),transparent 70%)} }
+        @keyframes freezeBg { 0%,100%{background:radial-gradient(circle at 50% 50%,rgba(125,211,252,0.12),transparent 70%)} 50%{background:radial-gradient(circle at 50% 50%,rgba(125,211,252,0.25),transparent 70%)} }
+        @keyframes luckyBg { 0%,100%{background:radial-gradient(circle at 50% 50%,rgba(251,191,36,0.15),transparent 70%)} 50%{background:radial-gradient(circle at 50% 50%,rgba(251,191,36,0.35),transparent 70%)} }
+        @keyframes doubleBg { 0%,100%{background:radial-gradient(circle at 50% 50%,rgba(168,85,247,0.12),transparent 70%)} 50%{background:radial-gradient(circle at 50% 50%,rgba(168,85,247,0.25),transparent 70%)} }
+        @keyframes dangerPulse { 0%,100%{box-shadow:inset 0 0 60px rgba(239,68,68,0.15)} 50%{box-shadow:inset 0 0 100px rgba(239,68,68,0.3)} }
+        @keyframes mysterySpin { 0%{transform:rotate(0)} 100%{transform:rotate(360deg)} }
+        @keyframes shieldRing { 0%,100%{box-shadow:0 0 15px 3px rgba(59,130,246,0.4)} 50%{box-shadow:0 0 25px 8px rgba(59,130,246,0.7)} }
+        @keyframes rainbowShift { 0%{filter:hue-rotate(0deg)} 100%{filter:hue-rotate(360deg)} }
+        @keyframes bossShake { 0%,100%{transform:translate(-50%,-50%) rotate(0)} 25%{transform:translate(-52%,-48%) rotate(-3deg)} 75%{transform:translate(-48%,-52%) rotate(3deg)} }
+        @keyframes chestShake { 0%,100%{transform:rotate(0) scale(1)} 25%{transform:rotate(-5deg) scale(1.05)} 75%{transform:rotate(5deg) scale(1.05)} }
+        @keyframes chestBurst { 0%{transform:scale(1)} 50%{transform:scale(1.3)} 100%{transform:scale(1)} }
+        @keyframes modalIn { 0%{transform:scale(0.8);opacity:0} 100%{transform:scale(1);opacity:1} }
+        @keyframes countdownPulse { 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(1.2);opacity:0.7} }
+        @keyframes adrenalineBg { 0%,100%{background:radial-gradient(circle at 50% 50%,rgba(239,68,68,0.1),transparent 60%)} 50%{background:radial-gradient(circle at 50% 50%,rgba(239,68,68,0.25),transparent 60%)} }
+        @keyframes nudgeShake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-3px)} 75%{transform:translateX(3px)} }
+        @keyframes firstWinPop { 0%{transform:scale(0) rotate(-10deg);opacity:0} 60%{transform:scale(1.2) rotate(5deg);opacity:1} 100%{transform:scale(1) rotate(0);opacity:1} }
+        @keyframes lossChaseGlow { 0%,100%{box-shadow:0 0 20px 5px rgba(249,115,22,0.4)} 50%{box-shadow:0 0 40px 15px rgba(249,115,22,0.7)} }
+        @keyframes streakWarningPulse { 0%,100%{opacity:0.7} 50%{opacity:1} }
+        @keyframes collectionPop { 0%{transform:scale(0) rotate(-15deg);opacity:0} 60%{transform:scale(1.2) rotate(5deg);opacity:1} 100%{transform:scale(1) rotate(0);opacity:1} }
       `}</style>
 
       <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none z-30" />
-
       {flash && <div className="absolute inset-0 z-40 pointer-events-none" style={{ background: flash }} />}
 
       {game.frenzy && <div className="absolute inset-0 z-0 pointer-events-none" style={{ animation: "frenzyBg 0.8s ease-in-out infinite" }} />}
@@ -432,13 +372,8 @@ function App() {
       {game.timeFreeze && <div className="absolute inset-0 z-0 pointer-events-none" style={{ animation: "freezeBg 0.8s ease-in-out infinite" }} />}
       {game.luckyTime && <div className="absolute inset-0 z-0 pointer-events-none" style={{ animation: "luckyBg 0.5s ease-in-out infinite" }} />}
       {game.doublePoints && <div className="absolute inset-0 z-0 pointer-events-none" style={{ animation: "doubleBg 0.8s ease-in-out infinite" }} />}
-
-      {game.gameState === "playing" && game.lives === 1 && (
-        <div className="absolute inset-0 z-0 pointer-events-none" style={{ animation: "dangerPulse 0.8s ease-in-out infinite" }} />
-      )}
-      {game.adrenaline && (
-        <div className="absolute inset-0 z-0 pointer-events-none" style={{ animation: "adrenalineBg 0.6s ease-in-out infinite" }} />
-      )}
+      {game.gameState === "playing" && game.lives === 1 && <div className="absolute inset-0 z-0 pointer-events-none" style={{ animation: "dangerPulse 0.8s ease-in-out infinite" }} />}
+      {game.adrenaline && <div className="absolute inset-0 z-0 pointer-events-none" style={{ animation: "adrenalineBg 0.6s ease-in-out infinite" }} />}
 
       <div id="game-area" className="absolute inset-0 z-10" style={shakeStyle}>
         {game.gameState === "playing" && game.orbs.map((orb) => {
@@ -449,66 +384,47 @@ function App() {
           const isRainbow = orb.type === "rainbow";
           const isBoss = orb.type === "boss";
           return (
-            <button
-              key={orb.id}
-              onPointerDown={(e) => handleOrbTap(orb, e)}
+            <button key={orb.id} onPointerDown={(e) => handleOrbTap(orb, e)}
               className={`absolute rounded-full bg-gradient-to-br ${colors.bg} border-2 ${colors.border} shadow-2xl ${colors.glow} cursor-pointer transition-transform hover:scale-110 active:scale-90`}
               style={{
-                left: `${orb.x}%`,
-                top: `${orb.y}%`,
-                width: orb.size,
-                height: orb.size,
+                left: `${orb.x}%`, top: `${orb.y}%`, width: orb.size, height: orb.size,
                 transform: "translate(-50%, -50%)",
-                animation: isBoss
-                  ? `orbAppear 200ms ease-out, bossShake 400ms ease-in-out infinite`
-                  : isRainbow
-                  ? `orbAppear 200ms ease-out, orbPulse 600ms ease-in-out infinite, rainbowShift 2s linear infinite`
+                animation: isBoss ? `orbAppear 200ms ease-out, bossShake 400ms ease-in-out infinite`
+                  : isRainbow ? `orbAppear 200ms ease-out, orbPulse 600ms ease-in-out infinite, rainbowShift 2s linear infinite`
                   : `orbAppear 200ms ease-out, orbPulse 800ms ease-in-out ${orb.pulse}s infinite`,
                 opacity: isGhost ? 0.5 : lifePercent < 0.3 ? lifePercent * 2 : 1,
-              }}
-            >
+              }}>
               {orb.type === "golden" && <Star className="absolute inset-0 m-auto w-1/2 h-1/2 text-white drop-shadow-lg" fill="white" />}
               {orb.type === "bomb" && <span className="absolute inset-0 flex items-center justify-center text-2xl">💣</span>}
               {orb.type === "bonus" && <Sparkles className="absolute inset-0 m-auto w-1/2 h-1/2 text-white drop-shadow-lg" />}
               {orb.type === "frenzy" && <Zap className="absolute inset-0 m-auto w-1/2 h-1/2 text-white drop-shadow-lg" fill="white" />}
-              {orb.type === "mystery" && (
-                <HelpCircle className="absolute inset-0 m-auto w-1/2 h-1/2 text-white drop-shadow-lg" style={{ animation: "mysterySpin 2s linear infinite" }} />
-              )}
+              {orb.type === "mystery" && <HelpCircle className="absolute inset-0 m-auto w-1/2 h-1/2 text-white drop-shadow-lg" style={{ animation: "mysterySpin 2s linear infinite" }} />}
               {orb.type === "shield" && <Shield className="absolute inset-0 m-auto w-1/2 h-1/2 text-white drop-shadow-lg" />}
               {orb.type === "comeback" && <TrendingUp className="absolute inset-0 m-auto w-1/2 h-1/2 text-white drop-shadow-lg" />}
               {orb.type === "rainbow" && <Rainbow className="absolute inset-0 m-auto w-1/2 h-1/2 text-white drop-shadow-lg" />}
-              {orb.type === "boss" && (
-                <>
-                  <Swords className="absolute inset-0 m-auto w-1/2 h-1/2 text-white drop-shadow-lg" />
-                  {orb.hp && orb.maxHp && (
-                    <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 w-3/4 h-1.5 rounded-full bg-black/50 overflow-hidden">
-                      <div className="h-full bg-red-400 rounded-full" style={{ width: `${(orb.hp / orb.maxHp) * 100}%` }} />
-                    </div>
-                  )}
-                </>
-              )}
+              {orb.type === "boss" && (<><Swords className="absolute inset-0 m-auto w-1/2 h-1/2 text-white drop-shadow-lg" />{orb.hp && orb.maxHp && (<div className="absolute -bottom-3 left-1/2 -translate-x-1/2 w-3/4 h-1.5 rounded-full bg-black/50 overflow-hidden"><div className="h-full bg-red-400 rounded-full" style={{ width: `${(orb.hp / orb.maxHp) * 100}%` }} /></div>)}</>)}
               {orb.type === "timefreeze" && <Snowflake className="absolute inset-0 m-auto w-1/2 h-1/2 text-white drop-shadow-lg" />}
               {orb.type === "chain" && <LinkIcon className="absolute inset-0 m-auto w-1/2 h-1/2 text-white drop-shadow-lg" />}
               {orb.type === "ghost" && <Ghost className="absolute inset-0 m-auto w-1/2 h-1/2 text-white drop-shadow-lg" />}
               {orb.type === "treasure" && <Gift className="absolute inset-0 m-auto w-1/2 h-1/2 text-white drop-shadow-lg" />}
-              {orb.type === "normal" && (
-                <span className="absolute inset-0 flex items-center justify-center">
-                  <span className="w-1/3 h-1/3 rounded-full bg-white/40" />
-                </span>
-              )}
-              {!isBoss && (
-                <svg className="absolute inset-0 w-full h-full -rotate-90" viewBox="0 0 100 100">
-                  <circle cx="50" cy="50" r="46" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="3" strokeDasharray={`${lifePercent * 289} 289`} />
-                </svg>
-              )}
+              {orb.type === "normal" && <span className="absolute inset-0 flex items-center justify-center"><span className="w-1/3 h-1/3 rounded-full bg-white/40" /></span>}
+              {!isBoss && (<svg className="absolute inset-0 w-full h-full -rotate-90" viewBox="0 0 100 100"><circle cx="50" cy="50" r="46" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="3" strokeDasharray={`${lifePercent * 289} 289`} /></svg>)}
             </button>
           );
         })}
 
-        {/* Idle / Start screen */}
+        {/* IDLE / START SCREEN */}
         {game.gameState === "idle" && (
           <div className="absolute inset-0 flex flex-col items-center justify-center z-20 overflow-y-auto py-8">
             <div className="text-center px-6 max-w-lg" style={{ animation: "slideUp 600ms ease-out" }}>
+              {/* Streak FOMO warning */}
+              {showStreakWarning && game.dailyStreak >= 2 && (
+                <div className="mb-4 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-orange-500/15 border border-orange-400/40 text-orange-300 text-sm font-bold" style={{ animation: "streakWarningPulse 1.5s ease-in-out infinite" }}>
+                  <AlertTriangle className="w-4 h-4" />
+                  Você tem {game.dailyStreak} dias de sequência! Não perca!
+                </div>
+              )}
+
               <div className="mb-6 flex justify-center gap-2">
                 {[Star, Zap, Flame, Crown, Shield].map((Icon, i) => (
                   <div key={i} className="w-14 h-14 rounded-2xl bg-gradient-to-br from-cyan-500/20 to-blue-600/20 border border-cyan-400/30 flex items-center justify-center" style={{ animation: `orbPulse 1.5s ease-in-out ${i * 0.2}s infinite` }}>
@@ -516,16 +432,13 @@ function App() {
                   </div>
                 ))}
               </div>
-              <h1 className="text-5xl font-black text-white mb-3 tracking-tight">
-                ORBRUSH<span className="text-cyan-400">.FUN</span>
-              </h1>
+              <h1 className="text-5xl font-black text-white mb-3 tracking-tight">ORBRUSH<span className="text-cyan-400">.FUN</span></h1>
+
               {game.prestige > 0 && (
                 <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/15 border border-amber-400/30 text-amber-300 text-sm font-bold mb-3">
                   <Crown className="w-4 h-4" /> Prestígio {game.prestige} · +{Math.round(game.prestige * 10)}% pontos
                 </div>
               )}
-
-              {/* Gem balance */}
               <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-fuchsia-500/15 border border-fuchsia-400/30 text-fuchsia-300 text-sm font-bold mb-3">
                 <Gem className="w-4 h-4" /> {gems.toLocaleString()} gemas
               </div>
@@ -534,8 +447,12 @@ function App() {
                   <Flame className="w-4 h-4" fill="currentColor" /> Sequência: {game.sessionStreak} partidas · Próxima: {game.sessionMult.toFixed(1)}x pontos!
                 </div>
               )}
+              {collectionStats.discovered > 0 && (
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-400/30 text-emerald-300 text-sm font-bold mb-3">
+                  <BookOpen className="w-4 h-4" /> Coleção: {collectionStats.discovered}/{collectionStats.total}
+                </div>
+              )}
 
-              {/* Active power-ups indicator */}
               {activePowerUpCount > 0 && (
                 <div className="mb-3 flex items-center justify-center gap-2 flex-wrap">
                   {activePowerUps.shield && <span className="text-xs px-2 py-1 rounded-full bg-blue-500/20 border border-blue-400/40 text-blue-300 font-bold">🛡️ Escudo</span>}
@@ -546,12 +463,8 @@ function App() {
                 </div>
               )}
 
-              <p className="text-slate-400 text-lg mb-2 leading-relaxed">
-                Toque nos orbes. Faça combos. Desbloqueie conquistas.
-              </p>
-              <p className="text-slate-500 text-sm mb-6">
-                Quantos pontos você consegue antes de perder todas as vidas?
-              </p>
+              <p className="text-slate-400 text-lg mb-2">Toque nos orbes. Faça combos. Desbloqueie conquistas.</p>
+              <p className="text-slate-500 text-sm mb-6">Quantos pontos você consegue antes de perder todas as vidas?</p>
 
               {/* Meta-game buttons */}
               <div className="mb-4 flex items-center justify-center gap-2 flex-wrap">
@@ -566,6 +479,9 @@ function App() {
                 </button>
                 <button onClick={() => setModal("shop")} className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-fuchsia-500/15 border border-fuchsia-400/30 text-fuchsia-300 font-bold text-sm hover:bg-fuchsia-500/25 transition-colors">
                   <ShoppingBag className="w-4 h-4" /> Loja
+                </button>
+                <button onClick={() => setModal("collection")} className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500/15 border border-emerald-400/30 text-emerald-300 font-bold text-sm hover:bg-emerald-500/25 transition-colors">
+                  <BookOpen className="w-4 h-4" /> Coleção
                 </button>
               </div>
 
@@ -610,10 +526,7 @@ function App() {
               )}
 
               <button onClick={handleStartGame} className="group relative px-12 py-4 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold text-xl shadow-2xl shadow-cyan-500/40 hover:scale-105 active:scale-95 transition-transform">
-                <span className="flex items-center gap-3">
-                  <Play className="w-6 h-6" fill="white" />
-                  JOGAR
-                </span>
+                <span className="flex items-center gap-3"><Play className="w-6 h-6" fill="white" />JOGAR</span>
               </button>
 
               <div className="mt-6 flex flex-wrap gap-1.5 justify-center text-[11px] text-slate-500 max-w-md mx-auto">
@@ -636,10 +549,17 @@ function App() {
           </div>
         )}
 
-        {/* Game Over screen */}
+        {/* GAME OVER SCREEN */}
         {game.gameState === "gameover" && (
           <div className="absolute inset-0 flex flex-col items-center justify-center z-20 bg-slate-950/60 backdrop-blur-sm">
             <div className="text-center px-6 max-w-md" style={{ animation: "slideUp 500ms ease-out" }}>
+              {/* Loss-chase bonus banner */}
+              {lossChaseActive && (
+                <div className="mb-4 inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-orange-500/20 border-2 border-orange-400/50 text-orange-300 font-black" style={{ animation: "lossChaseGlow 1s ease-in-out infinite" }}>
+                  <Timer className="w-5 h-5" />
+                  {lossChase.reason} · {lossChase.secondsLeft}s
+                </div>
+              )}
               {game.newRecord && game.score > 0 && (
                 <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-300 font-bold text-sm mb-3" style={{ animation: "pulseGlow 1s ease-in-out infinite" }}>
                   <Crown className="w-4 h-4" /> NOVO RECORDE!
@@ -651,9 +571,7 @@ function App() {
                 </div>
               )}
               <h2 className="text-4xl font-black text-white mb-2">Fim de Jogo</h2>
-              <div className="text-6xl font-black text-cyan-400 mb-2" style={{ animation: "scoreBump 600ms ease-out" }}>
-                {game.score.toLocaleString()}
-              </div>
+              <div className="text-6xl font-black text-cyan-400 mb-2" style={{ animation: "scoreBump 600ms ease-out" }}>{game.score.toLocaleString()}</div>
               {game.gems > 0 && (
                 <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-fuchsia-500/15 border border-fuchsia-400/30 text-fuchsia-300 text-sm font-bold mb-4">
                   <Gem className="w-4 h-4" /> +{game.gems} gemas ganhas!
@@ -692,48 +610,33 @@ function App() {
                 </div>
               </div>
 
-              {/* Free chest after every game */}
               <button onClick={() => setModal("chest")} className="mb-3 w-full px-8 py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold text-lg shadow-2xl shadow-amber-500/40 hover:scale-105 active:scale-95 transition-transform">
-                <span className="flex items-center justify-center gap-2">
-                  <Gift className="w-5 h-5" /> ABRIR BAÚ GRÁTIS
-                </span>
+                <span className="flex items-center justify-center gap-2"><Gift className="w-5 h-5" /> ABRIR BAÚ GRÁTIS</span>
               </button>
-
               {game.canRevive && game.score > 0 && (
                 <button onClick={game.revive} className="mb-3 w-full px-8 py-3.5 rounded-2xl bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold text-lg shadow-2xl shadow-green-500/40 hover:scale-105 active:scale-95 transition-transform">
-                  <span className="flex items-center justify-center gap-2">
-                    <Heart className="w-5 h-5" fill="currentColor" /> REVIVER (1 vida)
-                  </span>
+                  <span className="flex items-center justify-center gap-2"><Heart className="w-5 h-5" fill="currentColor" /> REVIVER (1 vida)</span>
                 </button>
               )}
-
-              <button onClick={handleStartGame} className="group px-10 py-4 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold text-lg shadow-2xl shadow-cyan-500/40 hover:scale-105 active:scale-95 transition-transform">
-                <span className="flex items-center gap-2">
-                  <RotateCcw className="w-5 h-5" /> JOGAR DE NOVO
-                </span>
+              <button onClick={handleStartGame} className={`group px-10 py-4 rounded-2xl text-white font-bold text-lg shadow-2xl hover:scale-105 active:scale-95 transition-transform ${lossChaseActive ? "bg-gradient-to-r from-orange-500 to-red-600 shadow-orange-500/40" : "bg-gradient-to-r from-cyan-500 to-blue-600 shadow-cyan-500/40"}`}>
+                <span className="flex items-center gap-2"><RotateCcw className="w-5 h-5" /> {lossChaseActive ? `JOGAR (${lossChase.multiplier}x BÔNUS!)` : "JOGAR DE NOVO"}</span>
               </button>
-
-              {/* Auto-restart countdown */}
               {game.autoRestartCountdown > 0 && (
-                <div className="mt-4 text-slate-400 text-sm">
-                  Recomeçando em <span className="text-cyan-400 font-bold" style={{ animation: "countdownPulse 1s ease-in-out infinite" }}>{game.autoRestartCountdown}</span>s
-                </div>
+                <div className="mt-4 text-slate-400 text-sm">Recomeçando em <span className="text-cyan-400 font-bold" style={{ animation: "countdownPulse 1s ease-in-out infinite" }}>{game.autoRestartCountdown}</span>s</div>
               )}
             </div>
           </div>
         )}
       </div>
 
-      {/* HUD — top bar */}
+      {/* HUD */}
       {game.gameState === "playing" && (
         <>
           <div className="absolute top-0 left-0 right-0 z-20 p-3 pointer-events-none">
             <div className="flex items-start justify-between gap-3">
               <div className="flex flex-col gap-0.5">
                 <div className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Pontos</div>
-                <div key={game.score} className="text-2xl font-black text-white tabular-nums leading-none" style={{ animation: "scoreBump 200ms ease-out" }}>
-                  {game.score.toLocaleString()}
-                </div>
+                <div key={game.score} className="text-2xl font-black text-white tabular-nums leading-none" style={{ animation: "scoreBump 200ms ease-out" }}>{game.score.toLocaleString()}</div>
                 <div className="text-[10px] text-slate-500">
                   Recorde: {Math.max(game.highScore, game.score).toLocaleString()}
                   {game.prestige > 0 && <span className="text-amber-300 ml-1">· P{game.prestige}</span>}
@@ -742,17 +645,15 @@ function App() {
                   {game.sessionMult > 1 && <span className="text-cyan-300 ml-1">· Sessão {game.sessionMult.toFixed(1)}x</span>}
                 </div>
               </div>
-
               <div className="flex flex-col items-center gap-1">
                 <div className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Vidas</div>
                 <div className="flex gap-1 items-center">
-                  {[0, 1, 2, 3].slice(0, game.lives > 3 ? 4 : 3).map((i) => (
+                  {Array.from({ length: Math.min(game.lives, 4) }).map((_, i) => (
                     <Heart key={i} className={`w-5 h-5 transition-all ${i < game.lives ? "text-rose-500 fill-rose-500" : "text-slate-700"}`} style={i < game.lives ? { animation: "heartBeat 1s ease-in-out infinite" } : undefined} />
                   ))}
                   {game.hasShield && <Shield className="w-5 h-5 text-blue-400 ml-1" style={{ animation: "shieldRing 1s ease-in-out infinite" }} />}
                 </div>
               </div>
-
               <div className="flex flex-col items-end gap-0.5">
                 <div className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Nível</div>
                 <div className="text-2xl font-black text-cyan-400 tabular-nums leading-none">{game.level}</div>
@@ -761,7 +662,6 @@ function App() {
                 </div>
               </div>
             </div>
-
             <div className="mt-2 flex items-center gap-2 flex-wrap">
               {game.progressiveJackpot > 0 && (
                 <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-400/30">
@@ -798,7 +698,6 @@ function App() {
             </div>
           </div>
 
-          {/* Combo meter + decay bar — bottom */}
           {game.combo > 0 && (
             <div className="absolute bottom-0 left-0 right-0 z-20 p-3 pointer-events-none flex flex-col items-center">
               <div key={game.combo} className="flex items-center gap-2 px-5 py-1.5 rounded-full border-2" style={{
@@ -810,17 +709,15 @@ function App() {
                 <span className={`font-black text-lg tabular-nums ${game.combo >= 25 ? "text-amber-300" : game.combo >= 10 ? "text-fuchsia-300" : "text-cyan-300"}`}>COMBO x{game.combo}</span>
                 {game.combo >= 5 && <span className="text-[10px] text-slate-400 font-bold">{game.combo >= 25 ? "3x" : game.combo >= 15 ? "2.5x" : game.combo >= 10 ? "2x" : "1.5x"}</span>}
               </div>
-              {/* Combo decay bar */}
               <div className="mt-1 w-32 h-1 rounded-full bg-slate-800 overflow-hidden">
                 <div className="h-full rounded-full transition-none" style={{
                   width: `${game.comboDecay * 100}%`,
-                  background: game.combo >= 25 ? "linear-gradient(90deg, #fbbf24, #f97316)" : game.combo >= 10 ? "linear-gradient(90deg, #a855f7, #fuchsia-500)" : "linear-gradient(90deg, #22d3ee, #3b82f6)",
+                  background: game.combo >= 25 ? "linear-gradient(90deg, #fbbf24, #f97316)" : game.combo >= 10 ? "linear-gradient(90deg, #a855f7, #d946ef)" : "linear-gradient(90deg, #22d3ee, #3b82f6)",
                 }} />
               </div>
             </div>
           )}
 
-          {/* Frenzy indicator */}
           {game.frenzy && (
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-none">
               <div className="flex items-center gap-3 px-6 py-3 rounded-2xl bg-orange-500/20 border-2 border-orange-400/50 backdrop-blur-sm" style={{ animation: "pulseGlow 0.8s ease-in-out infinite" }}>
@@ -829,8 +726,6 @@ function App() {
               </div>
             </div>
           )}
-
-          {/* Comeback indicator */}
           {game.comebackActive && (
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-none" style={{ marginTop: "60px" }}>
               <div className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-green-500/20 border-2 border-green-400/50 backdrop-blur-sm">
@@ -839,8 +734,6 @@ function App() {
               </div>
             </div>
           )}
-
-          {/* Time freeze indicator */}
           {game.timeFreeze && (
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-none" style={{ marginTop: game.comebackActive ? "120px" : "60px" }}>
               <div className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-sky-500/20 border-2 border-sky-400/50 backdrop-blur-sm">
@@ -849,8 +742,6 @@ function App() {
               </div>
             </div>
           )}
-
-          {/* Lucky Time indicator */}
           {game.luckyTime && (
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-none" style={{ marginTop: game.timeFreeze ? "180px" : game.comebackActive ? "180px" : "120px" }}>
               <div className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-amber-500/20 border-2 border-amber-400/50 backdrop-blur-sm" style={{ animation: "pulseGlow 0.5s ease-in-out infinite" }}>
@@ -859,8 +750,6 @@ function App() {
               </div>
             </div>
           )}
-
-          {/* Double points indicator */}
           {game.doublePoints && (
             <div className="absolute top-20 left-1/2 -translate-x-1/2 z-20 pointer-events-none">
               <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-fuchsia-500/20 border-2 border-fuchsia-400/50 backdrop-blur-sm">
@@ -869,8 +758,6 @@ function App() {
               </div>
             </div>
           )}
-
-          {/* Adrenaline indicator */}
           {game.adrenaline && (
             <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-20 pointer-events-none">
               <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-red-500/20 border-2 border-red-400/50 backdrop-blur-sm" style={{ animation: "pulseGlow 0.5s ease-in-out infinite" }}>
@@ -879,8 +766,6 @@ function App() {
               </div>
             </div>
           )}
-
-          {/* Near-record teaser */}
           {game.score > 0 && game.highScore > 0 && game.score < game.highScore && (game.highScore - game.score) <= 500 && (
             <div className="absolute bottom-32 left-1/2 -translate-x-1/2 z-20 pointer-events-none">
               <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/15 border border-amber-400/40" style={{ animation: "nudgeShake 0.5s ease-in-out 3" }}>
@@ -890,6 +775,18 @@ function App() {
             </div>
           )}
         </>
+      )}
+
+      {/* Social proof notifications */}
+      {socialNotifs.length > 0 && (
+        <div className="absolute bottom-4 left-4 z-40 flex flex-col gap-2 pointer-events-none">
+          {socialNotifs.map((n) => (
+            <div key={n.id} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-800/90 border border-slate-600/50 shadow-lg backdrop-blur-sm" style={{ animation: "slideInLeft 5s ease-in-out forwards" }}>
+              <span className="text-lg">{n.icon}</span>
+              <span className="text-xs text-slate-300 font-medium">{n.text}</span>
+            </div>
+          ))}
+        </div>
       )}
 
       {/* Mute button */}
@@ -906,6 +803,17 @@ function App() {
           </div>
         ))}
       </div>
+
+      {/* Collection discovery popup */}
+      {collectionPopup && (
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
+          <div className="flex flex-col items-center gap-2 px-6 py-4 rounded-2xl bg-emerald-500/20 border-2 border-emerald-400/50 backdrop-blur-md" style={{ animation: "collectionPop 500ms ease-out, slideDownFade 3s ease-in-out forwards" }}>
+            <span className="text-4xl">{collectionPopup.icon}</span>
+            <div className="text-lg font-black text-emerald-300">NOVO ORB!</div>
+            <div className="text-sm text-emerald-200">{collectionPopup.label}</div>
+          </div>
+        </div>
+      )}
 
       {/* Daily streak popup */}
       {showStreakPopup && streakInfo && (
@@ -929,17 +837,15 @@ function App() {
         </div>
       )}
 
-      {/* === MODALS === */}
-
-      {/* Backdrop for all modals */}
+      {/* MODALS */}
       {modal && (
         <div className="absolute inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4" onClick={closeModal}>
-          <div className="relative max-w-md w-full" onClick={(e) => e.stopPropagation()} style={{ animation: "modalIn 300ms ease-out" }}>
+          <div className="relative max-w-md w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()} style={{ animation: "modalIn 300ms ease-out" }}>
             <button onClick={closeModal} className="absolute -top-2 -right-2 w-8 h-8 rounded-full bg-slate-700 border border-slate-600 flex items-center justify-center text-slate-300 hover:text-white hover:bg-slate-600 transition-colors z-10">
               <X className="w-4 h-4" />
             </button>
 
-            {/* Chest Modal */}
+            {/* CHEST MODAL with near-miss tease */}
             {modal === "chest" && (
               <div className="bg-slate-900 border border-slate-700 rounded-3xl p-8 text-center">
                 <h3 className="text-2xl font-black text-white mb-1">Baú Grátis</h3>
@@ -954,8 +860,27 @@ function App() {
                 )}
 
                 {chestOpening && (
-                  <div className="w-32 h-32 mx-auto rounded-3xl bg-gradient-to-br from-amber-500/20 to-orange-600/20 border-2 border-amber-400/40 flex items-center justify-center" style={{ animation: "chestShake 300ms ease-in-out infinite" }}>
-                    <Gift className="w-16 h-16 text-amber-400" />
+                  <div>
+                    <div className="w-32 h-32 mx-auto rounded-3xl bg-gradient-to-br from-amber-500/20 to-orange-600/20 border-2 border-amber-400/40 flex items-center justify-center" style={{ animation: "chestShake 300ms ease-in-out infinite" }}>
+                      <Gift className="w-16 h-16 text-amber-400" />
+                    </div>
+                    {/* Tease rarity sequence */}
+                    <div className="mt-4 flex items-center justify-center gap-1.5">
+                      {chestTeaseRarities.map((r, i) => {
+                        const colors: Record<ChestRarity, string> = {
+                          common: "bg-slate-500", rare: "bg-blue-500", epic: "bg-fuchsia-500",
+                          legendary: "bg-amber-500", mythic: "bg-rose-500",
+                        };
+                        return (
+                          <div key={i} className={`w-3 h-3 rounded-full transition-all ${i === chestTeaseIndex ? `${colors[r]} scale-150 shadow-lg` : "bg-slate-700"}`} style={i === chestTeaseIndex ? { animation: "scoreBump 150ms ease-out" } : undefined} />
+                        );
+                      })}
+                    </div>
+                    {chestTeaseIndex >= 0 && chestTeaseIndex < chestTeaseRarities.length && (
+                      <div className="mt-2 text-sm font-bold" style={{ color: ["#94a3b8", "#3b82f6", "#d946ef", "#f59e0b", "#f43f5e"][RARITY_ORDER.indexOf(chestTeaseRarities[chestTeaseIndex])] }}>
+                        {["Comum", "Raro", "Épico", "Lendário", "MÍTICO"][RARITY_ORDER.indexOf(chestTeaseRarities[chestTeaseIndex])]}
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -967,29 +892,21 @@ function App() {
                     <div className="mt-4 text-3xl font-black text-white">{chestReward.label}!</div>
                     <div className="mt-1 text-4xl font-black text-amber-400">+{chestReward.gems} gemas</div>
                     {chestReward.rarity === "mythic" && <div className="mt-2 text-rose-400 font-black text-sm" style={{ animation: "countdownPulse 0.5s ease-in-out infinite" }}>MÍTICO! INCRÍVEL!</div>}
-                    <button onClick={() => { setChestReward(null); }} className="mt-6 px-8 py-3 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold hover:scale-105 active:scale-95 transition-transform">
-                      Continuar
-                    </button>
+                    {chestReward.rarity === "legendary" && <div className="mt-2 text-amber-400 font-black text-sm">LENDÁRIO!</div>}
+                    <button onClick={() => setChestReward(null)} className="mt-6 px-8 py-3 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold hover:scale-105 active:scale-95 transition-transform">Continuar</button>
                   </div>
                 )}
               </div>
             )}
 
-            {/* Wheel Modal */}
+            {/* WHEEL MODAL */}
             {modal === "wheel" && (
               <div className="bg-slate-900 border border-slate-700 rounded-3xl p-8 text-center">
                 <h3 className="text-2xl font-black text-white mb-1">Roleta Diária</h3>
                 <p className="text-slate-400 text-sm mb-6">{wheelAvailable ? "Gire e ganhe gemas!" : "Você já girou hoje. Volte amanhã!"}</p>
-
                 <div className="relative w-56 h-56 mx-auto mb-6">
-                  {/* Pointer */}
                   <div className="absolute top-0 left-1/2 -translate-x-1/2 z-10 w-0 h-0 border-l-[10px] border-r-[10px] border-t-[16px] border-l-transparent border-r-transparent border-t-amber-400" />
-
-                  {/* Wheel */}
-                  <div className="absolute inset-0 rounded-full border-4 border-slate-600 overflow-hidden" style={{
-                    transform: `rotate(${wheelAngle}deg)`,
-                    transition: wheelSpinning ? "transform 4s cubic-bezier(0.17, 0.67, 0.12, 0.99)" : "none",
-                  }}>
+                  <div className="absolute inset-0 rounded-full border-4 border-slate-600 overflow-hidden" style={{ transform: `rotate(${wheelAngle}deg)`, transition: wheelSpinning ? "transform 4s cubic-bezier(0.17, 0.67, 0.12, 0.99)" : "none" }}>
                     {WHEEL_SEGMENTS.map((seg, i) => {
                       const segAngle = 360 / WHEEL_SEGMENTS.length;
                       const startAngle = i * segAngle - 90;
@@ -998,57 +915,39 @@ function App() {
                           clipPath: `polygon(50% 50%, ${50 + 50 * Math.cos((startAngle * Math.PI) / 180)}% ${50 + 50 * Math.sin((startAngle * Math.PI) / 180)}%, ${50 + 50 * Math.cos(((startAngle + segAngle) * Math.PI) / 180)}% ${50 + 50 * Math.sin(((startAngle + segAngle) * Math.PI) / 180)}%)`,
                           background: seg.color,
                         }}>
-                          <span className="text-white font-black text-sm" style={{ transform: `rotate(${startAngle + segAngle / 2}deg) translateY(-60px)` }}>
-                            {seg.label}
-                          </span>
+                          <span className="text-white font-black text-sm" style={{ transform: `rotate(${startAngle + segAngle / 2}deg) translateY(-60px)` }}>{seg.label}</span>
                         </div>
                       );
                     })}
                   </div>
                 </div>
-
                 {wheelResult !== null && !wheelSpinning && (
-                  <div className="mb-4 text-2xl font-black text-amber-400" style={{ animation: "scoreBump 500ms ease-out" }}>
-                    +{WHEEL_SEGMENTS[wheelResult].gems} gemas!
-                  </div>
+                  <div className="mb-4 text-2xl font-black text-amber-400" style={{ animation: "scoreBump 500ms ease-out" }}>+{WHEEL_SEGMENTS[wheelResult].gems} gemas!</div>
                 )}
-
                 <button onClick={handleSpinWheel} disabled={!wheelAvailable || wheelSpinning} className="px-8 py-3 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold hover:scale-105 active:scale-95 transition-transform disabled:opacity-40 disabled:cursor-not-allowed">
                   {wheelSpinning ? "Girando..." : wheelAvailable ? "GIRAR" : "Volte amanhã"}
                 </button>
               </div>
             )}
 
-            {/* Shop Modal */}
+            {/* SHOP MODAL */}
             {modal === "shop" && (
               <div className="bg-slate-900 border border-slate-700 rounded-3xl p-8">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-2xl font-black text-white">Loja de Power-ups</h3>
-                  <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-fuchsia-500/15 border border-fuchsia-400/30 text-fuchsia-300 font-bold text-sm">
-                    <Gem className="w-4 h-4" /> {gems}
-                  </div>
+                  <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-fuchsia-500/15 border border-fuchsia-400/30 text-fuchsia-300 font-bold text-sm"><Gem className="w-4 h-4" /> {gems}</div>
                 </div>
                 <p className="text-slate-400 text-sm mb-4">Compre power-ups para a próxima partida. Eles ativam automaticamente.</p>
-
                 {buyError && <div className="mb-3 text-rose-400 text-sm font-bold text-center">{buyError}</div>}
-
-                <div className="space-y-2 max-h-72 overflow-y-auto">
+                <div className="space-y-2">
                   {POWER_UPS.map((p) => {
                     const owned = powerUps[p.key as keyof PowerUps];
                     return (
                       <div key={p.key} className={`flex items-center gap-3 p-3 rounded-xl border ${owned ? "bg-green-500/10 border-green-400/30" : "bg-slate-800/60 border-slate-700"}`}>
                         <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${p.color} flex items-center justify-center text-lg flex-shrink-0`}>{p.icon}</div>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-white font-bold text-sm">{p.name}</div>
-                          <div className="text-slate-400 text-xs">{p.desc}</div>
-                        </div>
-                        {owned ? (
-                          <div className="flex items-center gap-1 text-green-400 font-bold text-xs"><CheckCircle2 className="w-4 h-4" /> Ativo</div>
-                        ) : (
-                          <button onClick={() => handleBuy(p.key, p.cost)} disabled={gems < p.cost} className={`flex items-center gap-1 px-3 py-1.5 rounded-lg font-bold text-xs ${gems >= p.cost ? "bg-fuchsia-500/20 border border-fuchsia-400/40 text-fuchsia-300 hover:bg-fuchsia-500/30" : "bg-slate-700/50 border border-slate-600 text-slate-500 cursor-not-allowed"} transition-colors`}>
-                            <Gem className="w-3 h-3" /> {p.cost}
-                          </button>
-                        )}
+                        <div className="flex-1 min-w-0"><div className="text-white font-bold text-sm">{p.name}</div><div className="text-slate-400 text-xs">{p.desc}</div></div>
+                        {owned ? <div className="flex items-center gap-1 text-green-400 font-bold text-xs"><CheckCircle2 className="w-4 h-4" /> Ativo</div>
+                          : <button onClick={() => handleBuy(p.key, p.cost)} disabled={gems < p.cost} className={`flex items-center gap-1 px-3 py-1.5 rounded-lg font-bold text-xs ${gems >= p.cost ? "bg-fuchsia-500/20 border border-fuchsia-400/40 text-fuchsia-300 hover:bg-fuchsia-500/30" : "bg-slate-700/50 border border-slate-600 text-slate-500 cursor-not-allowed"} transition-colors`}><Gem className="w-3 h-3" /> {p.cost}</button>}
                       </div>
                     );
                   })}
@@ -1056,17 +955,14 @@ function App() {
               </div>
             )}
 
-            {/* Quests Modal */}
+            {/* QUESTS MODAL */}
             {modal === "quests" && (
               <div className="bg-slate-900 border border-slate-700 rounded-3xl p-8">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-2xl font-black text-white">Missões Diárias</h3>
-                  <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-fuchsia-500/15 border border-fuchsia-400/30 text-fuchsia-300 font-bold text-sm">
-                    <Gem className="w-4 h-4" /> {gems}
-                  </div>
+                  <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-fuchsia-500/15 border border-fuchsia-400/30 text-fuchsia-300 font-bold text-sm"><Gem className="w-4 h-4" /> {gems}</div>
                 </div>
                 <p className="text-slate-400 text-sm mb-4">Complete 3 missões e ganhe 50 gemas cada!</p>
-
                 <div className="space-y-2 mb-4">
                   {quests.length === 0 && <div className="text-slate-500 text-sm text-center py-4">Carregando missões...</div>}
                   {quests.map((q, i) => (
@@ -1074,26 +970,44 @@ function App() {
                       <span className="text-xl flex-shrink-0">{questIcon(q.type)}</span>
                       <div className="flex-1 min-w-0">
                         <div className={`font-bold text-sm ${q.claimed ? "text-slate-500 line-through" : "text-white"}`}>{questLabel(q.type)}</div>
-                        <div className="w-full h-1.5 rounded-full bg-slate-700 overflow-hidden mt-1">
-                          <div className="h-full bg-gradient-to-r from-green-400 to-emerald-500 rounded-full transition-all" style={{ width: `${Math.min(100, (q.progress / q.target) * 100)}%` }} />
-                        </div>
+                        <div className="w-full h-1.5 rounded-full bg-slate-700 overflow-hidden mt-1"><div className="h-full bg-gradient-to-r from-green-400 to-emerald-500 rounded-full transition-all" style={{ width: `${Math.min(100, (q.progress / q.target) * 100)}%` }} /></div>
                         <div className="text-slate-400 text-xs mt-0.5">{q.progress} / {q.target}</div>
                       </div>
-                      {q.claimed ? (
-                        <span className="text-slate-500 text-xs font-bold">Resgatado</span>
-                      ) : q.done ? (
-                        <span className="flex items-center gap-1 text-green-400 text-xs font-bold"><CheckCircle2 className="w-4 h-4" /> +50</span>
-                      ) : (
-                        <Circle className="w-5 h-5 text-slate-600 flex-shrink-0" />
-                      )}
+                      {q.claimed ? <span className="text-slate-500 text-xs font-bold">Resgatado</span>
+                        : q.done ? <span className="flex items-center gap-1 text-green-400 text-xs font-bold"><CheckCircle2 className="w-4 h-4" /> +50</span>
+                        : <Circle className="w-5 h-5 text-slate-600 flex-shrink-0" />}
                     </div>
                   ))}
                 </div>
-
                 {quests.some((q) => q.done && !q.claimed) && (
-                  <button onClick={handleClaimQuests} className="w-full px-6 py-3 rounded-2xl bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold hover:scale-105 active:scale-95 transition-transform">
-                    Resgatar Recompensas
-                  </button>
+                  <button onClick={handleClaimQuests} className="w-full px-6 py-3 rounded-2xl bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold hover:scale-105 active:scale-95 transition-transform">Resgatar Recompensas</button>
+                )}
+              </div>
+            )}
+
+            {/* COLLECTION MODAL */}
+            {modal === "collection" && (
+              <div className="bg-slate-900 border border-slate-700 rounded-3xl p-8">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-2xl font-black text-white">Coleção de Orbes</h3>
+                  <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-400/30 text-emerald-300 font-bold text-sm">
+                    <BookOpen className="w-4 h-4" /> {collectionStats.discovered}/{collectionStats.total}
+                  </div>
+                </div>
+                <p className="text-slate-400 text-sm mb-4">Descubra todos os tipos de orb! Cada um tem efeitos diferentes.</p>
+                <div className="grid grid-cols-3 gap-3">
+                  {collectionEntries.map((entry) => (
+                    <div key={entry.type} className={`flex flex-col items-center gap-1 p-3 rounded-xl border ${entry.discovered ? "bg-slate-800/60 border-slate-600" : "bg-slate-800/20 border-slate-700/50"}`}>
+                      <div className={`text-3xl ${entry.discovered ? "" : "opacity-30 grayscale"}`}>{entry.discovered ? entry.icon : "❓"}</div>
+                      <div className={`text-xs font-bold text-center ${entry.discovered ? "text-white" : "text-slate-600"}`}>{entry.discovered ? entry.label : "???"}</div>
+                      {entry.discovered && entry.count > 0 && <div className="text-[10px] text-slate-500">x{entry.count}</div>}
+                    </div>
+                  ))}
+                </div>
+                {collectionStats.discovered === collectionStats.total && (
+                  <div className="mt-4 text-center text-amber-400 font-black text-sm" style={{ animation: "pulseGlow 1s ease-in-out infinite" }}>
+                    🏅 PARABÉNS! Coleção completa!
+                  </div>
                 )}
               </div>
             )}
