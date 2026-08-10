@@ -2,7 +2,7 @@ const PREMIUM_KEY = "orbrush_premium";
 const PLAY_COUNT_KEY = "orbrush_play_count";
 const PAYWALL_SHOWN_KEY = "orbrush_paywall_shown";
 
-export const STRIPE_CHECKOUT_URL = "https://bolt.new/setup/stripe";
+export const STRIPE_CHECKOUT_URL = "https://buy.stripe.com/bJe6oH63f6bogfx8Inb7y09";
 
 export function isPremium(): boolean {
   try {
