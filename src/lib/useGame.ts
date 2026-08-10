@@ -167,6 +167,13 @@ export function useGame(callbacks: GameCallbacks) {
   const [doubleTimeLeft, setDoubleTimeLeft] = useState(0);
   const [gems, setGems] = useState(0);
   const [autoRestartCountdown, setAutoRestartCountdown] = useState(0);
+  const [sessionStreak, setSessionStreak] = useState(0);
+  const [sessionMult, setSessionMult] = useState(1);
+  const [adrenaline, setAdrenaline] = useState(false);
+  const [nearRecord, setNearRecord] = useState(false);
+  const [recordGap, setRecordGap] = useState(0);
+  const [firstWinToday, setFirstWinToday] = useState(false);
+  const [firstWinClaimed, setFirstWinClaimed] = useState(false);
 
   const orbIdRef = useRef(0);
   const comboTimerRef = useRef<number | null>(null);
@@ -205,6 +212,10 @@ export function useGame(callbacks: GameCallbacks) {
   const luckyTimeRef = useRef(false);
   const doublePointsRef = useRef(false);
   const gemsRef = useRef(0);
+  const sessionStreakRef = useRef(0);
+  const sessionMultRef = useRef(1);
+  const adrenalineRef = useRef(false);
+  const firstWinClaimedRef = useRef(false);
   const callbacksRef = useRef(callbacks);
   callbacksRef.current = callbacks;
 
@@ -234,6 +245,10 @@ export function useGame(callbacks: GameCallbacks) {
     luckyTimeRef.current = luckyTime;
     doublePointsRef.current = doublePoints;
     gemsRef.current = gems;
+    sessionStreakRef.current = sessionStreak;
+    sessionMultRef.current = sessionMult;
+    adrenalineRef.current = adrenaline;
+    firstWinClaimedRef.current = firstWinClaimed;
   };
   syncRefs();
 
@@ -455,10 +470,29 @@ export function useGame(callbacks: GameCallbacks) {
     setComboDecay(0);
 
     const finalScore = scoreRef.current;
+    const gap = highScoreRef.current - finalScore;
     if (finalScore > highScoreRef.current) {
       setHighScore(finalScore);
       highScoreRef.current = finalScore;
       setNewRecord(true);
+    } else if (gap > 0 && gap <= 500 && finalScore > 200) {
+      setNearRecord(true);
+      setRecordGap(gap);
+      playSoClose();
+    }
+    setSessionStreak((s) => s + 1);
+    sessionStreakRef.current += 1;
+    const newSessionMult = 1 + Math.min(sessionStreakRef.current * 0.1, 1.0);
+    setSessionMult(newSessionMult);
+    sessionMultRef.current = newSessionMult;
+    setAdrenaline(false);
+    adrenalineRef.current = false;
+    if (!firstWinClaimedRef.current && finalScore >= 1000) {
+      setFirstWinToday(true);
+      setFirstWinClaimed(true);
+      firstWinClaimedRef.current = true;
+      setGems((g) => g + 100);
+      gemsRef.current += 100;
     }
     setTotalGames((g) => g + 1);
 
@@ -622,6 +656,10 @@ export function useGame(callbacks: GameCallbacks) {
         if (newLives <= 1 && !droneRef.current) {
           startDrone();
           droneRef.current = true;
+          setAdrenaline(true);
+          adrenalineRef.current = true;
+          callbacksRef.current.onFlash("rgba(239,68,68,0.15)");
+          callbacksRef.current.onFloatText(50, 50, "ADRENALINA! 1.5x", "#ef4444", 36);
         }
         if (newLives <= 0) {
           endGame();
@@ -881,7 +919,9 @@ export function useGame(callbacks: GameCallbacks) {
       const prestigeMult = 1 + prestigeRef.current * 0.1;
       const luckyMultVal = luckyMultRef.current;
       const doubleMult = doublePointsRef.current ? 2 : 1;
-      const points = Math.floor(basePoints * comboMult * frenzyMult * comebackMult * prestigeMult * luckyMultVal * doubleMult);
+      const adrenalineMult = adrenalineRef.current ? 1.5 : 1;
+      const sessionMultVal = sessionMultRef.current;
+      const points = Math.floor(basePoints * comboMult * frenzyMult * comebackMult * prestigeMult * luckyMultVal * doubleMult * adrenalineMult * sessionMultVal);
 
       const newScore = scoreRef.current + points;
       setScore(newScore);
@@ -1022,6 +1062,10 @@ export function useGame(callbacks: GameCallbacks) {
     setDoubleTimeLeft(0);
     setGems(0);
     setAutoRestartCountdown(0);
+    setNearRecord(false);
+    setRecordGap(0);
+    setAdrenaline(false);
+    adrenalineRef.current = false;
     scoreRef.current = 0;
     comboRef.current = 0;
     levelRef.current = 1;
@@ -1179,6 +1223,12 @@ export function useGame(callbacks: GameCallbacks) {
     doubleTimeLeft,
     gems,
     autoRestartCountdown,
+    sessionStreak,
+    sessionMult,
+    adrenaline,
+    nearRecord,
+    recordGap,
+    firstWinToday,
     setHighScore,
     setDailyStreak,
     setPrestige,
