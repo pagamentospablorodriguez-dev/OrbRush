@@ -83,43 +83,43 @@ export interface PowerUps {
 }
 
 const ACHIEVEMENTS: Achievement[] = [
-  { id: "first_tap", title: "Primeiro Toque", desc: "Seu primeiro orb!", icon: "✨" },
-  { id: "combo_10", title: "Combo x10", desc: "Dez seguidos!", icon: "🔥" },
-  { id: "combo_25", title: "Combo x25", desc: "Imparável!", icon: "⚡" },
-  { id: "combo_50", title: "Combo x50", desc: "Lendário!", icon: "💎" },
-  { id: "combo_100", title: "Combo x100", desc: "IMORTAL!", icon: "🔮" },
-  { id: "golden_1", title: "Dourado!", desc: "Primeiro orb dourado", icon: "🌟" },
-  { id: "golden_10", title: "Colecionador", desc: "10 orbes dourados", icon: "👑" },
-  { id: "golden_50", title: "Midas", desc: "50 orbes dourados", icon: "🪙" },
-  { id: "level_5", title: "Nível 5", desc: "Subindo de nível!", icon: "🚀" },
-  { id: "level_10", title: "Nível 10", desc: "Mestre dos orbes", icon: "🏆" },
-  { id: "level_20", title: "Nível 20", desc: "Lenda viva", icon: "⭐" },
-  { id: "score_1k", title: "1.000 pontos", desc: "Marcou mil!", icon: "💯" },
-  { id: "score_10k", title: "10.000 pontos", desc: "Lenda absoluta", icon: "🎖️" },
-  { id: "score_50k", title: "50.000 pontos", desc: "Além da lenda", icon: "🥇" },
-  { id: "frenzy_1", title: "FRENESI!", desc: "Modo frenesi ativado", icon: "🌀" },
-  { id: "jackpot_1", title: "JACKPOT!", desc: "Ganhou o jackpot", icon: "🎰" },
-  { id: "mystery_1", title: "Mistério!", desc: "Orb misterioso revelado", icon: "❓" },
-  { id: "shield_1", title: "Escudo!", desc: "Proteção ativada", icon: "🛡️" },
-  { id: "comeback_1", title: "Comeback!", desc: "Recuperou do perigo", icon: "💥" },
-  { id: "prestige_1", title: "PRESTÍGIO!", desc: "Renasceu mais forte", icon: "🌟" },
-  { id: "challenge_done", title: "Desafio Diário!", desc: "Completou o desafio de hoje", icon: "🎯" },
-  { id: "rainbow_1", title: "Arco-Íris!", desc: "Orb arco-íris capturado", icon: "🌈" },
-  { id: "boss_1", title: "Caçador de Chefes", desc: "Derrotou um chefe", icon: "👹" },
-  { id: "timefreeze_1", title: "Tempo Congelado", desc: "Parou o tempo!", icon: "❄️" },
-  { id: "chain_1", title: "Reação em Cadeia", desc: "Cadeia explosiva!", icon: "🔗" },
-  { id: "ghost_1", title: "Fantasma", desc: "Capturou um orb fantasma", icon: "👻" },
-  { id: "treasure_1", title: "Tesouro!", desc: "Abriu um baú", icon: "💎" },
-  { id: "revive_1", title: "Segunda Chance", desc: "Reviveu!", icon: "❤️" },
-  { id: "milestone_1", title: "Marcos", desc: "Bônus de mil pontos!", icon: "🏁" },
-  { id: "lucky_5", title: "Sorte!", desc: "5 dourados seguidos", icon: "🍀" },
-  { id: "lucky_time", title: "Hora da Sorte!", desc: "Chuva de dourados!", icon: "🌟" },
-  { id: "collector_5", title: "Colecionador", desc: "Descobriu 5 tipos de orb", icon: "📚" },
-  { id: "collector_10", title: "Arquivista", desc: "Descobriu 10 tipos de orb", icon: "📖" },
-  { id: "collector_all", title: "Mestre da Coleção", desc: "Descobriu TODOS os orbes!", icon: "🏅" },
+  { id: "first_tap", title: "First Tap", desc: "Your first orb!", icon: "✨" },
+  { id: "combo_10", title: "Combo x10", desc: "Ten in a row!", icon: "🔥" },
+  { id: "combo_25", title: "Combo x25", desc: "Unstoppable!", icon: "⚡" },
+  { id: "combo_50", title: "Combo x50", desc: "Legendary!", icon: "💎" },
+  { id: "combo_100", title: "Combo x100", desc: "IMMORTAL!", icon: "🔮" },
+  { id: "golden_1", title: "Golden!", desc: "First golden orb", icon: "🌟" },
+  { id: "golden_10", title: "Collector", desc: "10 golden orbs", icon: "👑" },
+  { id: "golden_50", title: "Midas", desc: "50 golden orbs", icon: "🪙" },
+  { id: "level_5", title: "Level 5", desc: "Leveling up!", icon: "🚀" },
+  { id: "level_10", title: "Level 10", desc: "Orb master", icon: "🏆" },
+  { id: "level_20", title: "Level 20", desc: "Living legend", icon: "⭐" },
+  { id: "score_1k", title: "1,000 points", desc: "Scored a thousand!", icon: "💯" },
+  { id: "score_10k", title: "10,000 points", desc: "Absolute legend", icon: "🎖️" },
+  { id: "score_50k", title: "50,000 points", desc: "Beyond legend", icon: "🥇" },
+  { id: "frenzy_1", title: "FRENZY!", desc: "Frenzy mode activated", icon: "🌀" },
+  { id: "jackpot_1", title: "JACKPOT!", desc: "Won the jackpot", icon: "🎰" },
+  { id: "mystery_1", title: "Mystery!", desc: "Mystery orb revealed", icon: "❓" },
+  { id: "shield_1", title: "Shield!", desc: "Protection activated", icon: "🛡️" },
+  { id: "comeback_1", title: "Comeback!", desc: "Recovered from danger", icon: "💥" },
+  { id: "prestige_1", title: "PRESTIGE!", desc: "Reborn stronger", icon: "🌟" },
+  { id: "challenge_done", title: "Daily Challenge!", desc: "Completed today's challenge", icon: "🎯" },
+  { id: "rainbow_1", title: "Rainbow!", desc: "Rainbow orb captured", icon: "🌈" },
+  { id: "boss_1", title: "Boss Hunter", desc: "Defeated a boss", icon: "👹" },
+  { id: "timefreeze_1", title: "Time Frozen", desc: "Stopped time!", icon: "❄️" },
+  { id: "chain_1", title: "Chain Reaction", desc: "Explosive chain!", icon: "🔗" },
+  { id: "ghost_1", title: "Ghost", desc: "Captured a ghost orb", icon: "👻" },
+  { id: "treasure_1", title: "Treasure!", desc: "Opened a chest", icon: "💎" },
+  { id: "revive_1", title: "Second Chance", desc: "Revived!", icon: "❤️" },
+  { id: "milestone_1", title: "Milestones", desc: "Thousand-point bonus!", icon: "🏁" },
+  { id: "lucky_5", title: "Lucky!", desc: "5 golden orbs in a row", icon: "🍀" },
+  { id: "lucky_time", title: "Lucky Time!", desc: "Golden rain!", icon: "🌟" },
+  { id: "collector_5", title: "Collector", desc: "Discovered 5 orb types", icon: "📚" },
+  { id: "collector_10", title: "Archivist", desc: "Discovered 10 orb types", icon: "📖" },
+  { id: "collector_all", title: "Collection Master", desc: "Discovered ALL orbs!", icon: "🏅" },
 ];
 
-const REWARD_WORDS = ["BOM!", "ÓTIMO!", "INCRÍVEL!", "PERFEITO!", "INSANO!", "LENDA!", "DEUS!"];
+const REWARD_WORDS = ["GOOD!", "GREAT!", "AMAZING!", "PERFECT!", "INSANE!", "LEGEND!", "GODLIKE!"];
 
 const MILESTONE_STEP = 1000;
 const COMBO_WINDOW = 1600;
@@ -430,7 +430,7 @@ export function useGame(callbacks: GameCallbacks) {
     playLuckyStreak();
     callbacksRef.current.onFlash("rgba(251,191,36,0.3)");
     callbacksRef.current.onScreenShake(15);
-    callbacksRef.current.onFloatText(50, 50, "HORA DA SORTE!", "#fbbf24", 52);
+    callbacksRef.current.onFloatText(50, 50, "LUCKY TIME!", "#fbbf24", 52);
     unlock("lucky_time");
     if (luckyTimerRef.current) clearInterval(luckyTimerRef.current);
     luckyTimerRef.current = window.setInterval(() => {
@@ -662,7 +662,7 @@ export function useGame(callbacks: GameCallbacks) {
           hasShieldRef.current = false;
           callbacksRef.current.onBurst(px, py, 25, "#3b82f6", { speed: 5, size: 4, shape: "square" });
           callbacksRef.current.onShockwave(px, py, 180, "#3b82f6");
-          callbacksRef.current.onFloatText(px, py, "ESCUDO QUEBROU!", "#3b82f6", 28);
+          callbacksRef.current.onFloatText(px, py, "SHIELD BROKE!", "#3b82f6", 28);
           callbacksRef.current.onScreenShake(8);
           return;
         }
@@ -681,7 +681,7 @@ export function useGame(callbacks: GameCallbacks) {
           setAdrenaline(true);
           adrenalineRef.current = true;
           callbacksRef.current.onFlash("rgba(239,68,68,0.15)");
-          callbacksRef.current.onFloatText(50, 50, "ADRENALINA! 1.5x", "#ef4444", 36);
+          callbacksRef.current.onFloatText(50, 50, "ADRENALINE! 1.5x", "#ef4444", 36);
         }
         if (newLives <= 0) {
           endGame();
@@ -696,7 +696,7 @@ export function useGame(callbacks: GameCallbacks) {
         callbacksRef.current.onShockwave(px, py, 300, "#fbbf24");
         callbacksRef.current.onScreenShake(10);
         unlock("chain_1");
-        trackDiscovery("chain", "Orb Cadeia", "🔗");
+        trackDiscovery("chain", "Chain Orb", "🔗");
 
         const chainRadius = 25;
         setOrbs((prev) => {
@@ -731,7 +731,7 @@ export function useGame(callbacks: GameCallbacks) {
         if (newCombo > bestCombo) setBestCombo(newCombo);
         if (comboTimerRef.current) clearTimeout(comboTimerRef.current);
         comboTimerRef.current = window.setTimeout(() => resetCombo(true), COMBO_WINDOW);
-        callbacksRef.current.onFloatText(px, py, "CADEIA!", "#fbbf24", 36);
+        callbacksRef.current.onFloatText(px, py, "CHAIN!", "#fbbf24", 36);
         return;
       }
 
@@ -781,7 +781,7 @@ export function useGame(callbacks: GameCallbacks) {
         totalGoldenRef.current = newGolden;
         callbacksRef.current.onShockwave(px, py, 120, "#fbbf24");
         floatText = "+100";
-        trackDiscovery("golden", "Orb Dourado", "🌟");
+        trackDiscovery("golden", "Golden Orb", "🌟");
 
         const newLucky = luckyStreakRef.current + 1;
         setLuckyStreak(newLucky);
@@ -792,7 +792,7 @@ export function useGame(callbacks: GameCallbacks) {
           luckyMultRef.current = newMult;
           if (newLucky >= 5) {
             playLuckyStreak();
-            callbacksRef.current.onFloatText(px, py - 25, `SORTE x${newLucky}!`, "#4ade80", 24);
+            callbacksRef.current.onFloatText(px, py - 25, `LUCKY x${newLucky}!`, "#4ade80", 24);
             unlock("lucky_5");
           }
         }
@@ -809,17 +809,17 @@ export function useGame(callbacks: GameCallbacks) {
         luckyStreakRef.current = 0;
         setLuckyMult(1);
         luckyMultRef.current = 1;
-        trackDiscovery("bonus", "Orb Bônus", "✨");
+        trackDiscovery("bonus", "Bonus Orb", "✨");
       } else if (orb.type === "frenzy") {
         startFrenzy();
         basePoints = 30;
         color = "#f97316";
         particleCount = 40;
         particleShape = "star";
-        floatText = "FRENESI!";
+        floatText = "FRENZY!";
         callbacksRef.current.onShockwave(px, py, 250, "#f97316");
         callbacksRef.current.onScreenShake(10);
-        trackDiscovery("frenzy", "Orb Frenesi", "⚡");
+        trackDiscovery("frenzy", "Frenzy Orb", "⚡");
       } else if (orb.type === "mystery") {
         const outcomes = [
           { pts: 10, w: 40, label: "+10" },
@@ -843,7 +843,7 @@ export function useGame(callbacks: GameCallbacks) {
         floatText = chosen.label;
         callbacksRef.current.onShockwave(px, py, 80 + chosen.pts / 5, color);
         unlock("mystery_1");
-        trackDiscovery("mystery", "Orb Mistério", "❓");
+        trackDiscovery("mystery", "Mystery Orb", "❓");
       } else if (orb.type === "shield") {
         setHasShield(true);
         hasShieldRef.current = true;
@@ -851,10 +851,10 @@ export function useGame(callbacks: GameCallbacks) {
         color = "#3b82f6";
         particleCount = 25;
         particleShape = "circle";
-        floatText = "ESCUDO!";
+        floatText = "SHIELD!";
         callbacksRef.current.onShockwave(px, py, 150, "#3b82f6");
         unlock("shield_1");
-        trackDiscovery("shield", "Orb Escudo", "🛡️");
+        trackDiscovery("shield", "Shield Orb", "🛡️");
       } else if (orb.type === "comeback") {
         startComeback();
         basePoints = 50;
@@ -864,27 +864,27 @@ export function useGame(callbacks: GameCallbacks) {
         floatText = "COMEBACK!";
         callbacksRef.current.onShockwave(px, py, 250, "#22c55e");
         callbacksRef.current.onScreenShake(12);
-        trackDiscovery("comeback", "Orb Comeback", "📈");
+        trackDiscovery("comeback", "Comeback Orb", "📈");
       } else if (orb.type === "rainbow") {
         basePoints = 250;
         color = "#e879f9";
         particleCount = 50;
         particleShape = "star";
         playRainbow();
-        floatText = "ARCO-ÍRIS +250!";
+        floatText = "RAINBOW +250!";
         callbacksRef.current.onShockwave(px, py, 300, "#e879f9");
         callbacksRef.current.onFlash("rgba(232,121,249,0.2)");
         callbacksRef.current.onScreenShake(12);
         unlock("rainbow_1");
         questProgress("rainbow_1", 1, true);
-        trackDiscovery("rainbow", "Orb Arco-Íris", "🌈");
+        trackDiscovery("rainbow", "Rainbow Orb", "🌈");
       } else if (orb.type === "boss") {
         basePoints = 500 + levelRef.current * 50;
         color = "#ef4444";
         particleCount = 60;
         particleShape = "square";
         playBossDefeated();
-        floatText = `CHEFE! +${basePoints}`;
+        floatText = `BOSS! +${basePoints}`;
         callbacksRef.current.onShockwave(px, py, 400, "#ef4444");
         callbacksRef.current.onFlash("rgba(239,68,68,0.2)");
         callbacksRef.current.onScreenShake(20);
@@ -892,26 +892,26 @@ export function useGame(callbacks: GameCallbacks) {
         bossActiveRef.current = false;
         unlock("boss_1");
         questProgress("boss_1", 1, true);
-        trackDiscovery("boss", "Orb Chefe", "⚔️");
+        trackDiscovery("boss", "Boss Orb", "⚔️");
       } else if (orb.type === "timefreeze") {
         startTimeFreeze();
         basePoints = 30;
         color = "#7dd3fc";
         particleCount = 35;
         particleShape = "star";
-        floatText = "TEMPO CONGELADO!";
+        floatText = "TIME FROZEN!";
         callbacksRef.current.onShockwave(px, py, 280, "#7dd3fc");
-        trackDiscovery("timefreeze", "Orb Congelamento", "❄️");
+        trackDiscovery("timefreeze", "Freeze Orb", "❄️");
       } else if (orb.type === "ghost") {
         basePoints = 75;
         color = "#cbd5e1";
         particleCount = 25;
         particleShape = "circle";
         playGhost();
-        floatText = "FANTASMA +75!";
+        floatText = "GHOST +75!";
         callbacksRef.current.onShockwave(px, py, 180, "#cbd5e1");
         unlock("ghost_1");
-        trackDiscovery("ghost", "Orb Fantasma", "👻");
+        trackDiscovery("ghost", "Ghost Orb", "👻");
       } else if (orb.type === "treasure") {
         const outcomes = [
           { pts: 200, w: 35, label: "+200" },
@@ -932,20 +932,20 @@ export function useGame(callbacks: GameCallbacks) {
         particleCount = 40 + chosen.pts / 20;
         particleShape = "star";
         playTreasureOpen();
-        floatText = `TESOURO ${chosen.label}`;
+        floatText = `TREASURE ${chosen.label}`;
         callbacksRef.current.onShockwave(px, py, 250 + chosen.pts / 10, "#fbbf24");
         callbacksRef.current.onFlash("rgba(251,191,36,0.2)");
         callbacksRef.current.onScreenShake(15);
         unlock("treasure_1");
         questProgress("treasure_1", 1, true);
-        trackDiscovery("treasure", "Orb Tesouro", "💎");
+        trackDiscovery("treasure", "Treasure Orb", "💎");
       } else {
         playTap(newCombo);
         setLuckyStreak(0);
         luckyStreakRef.current = 0;
         setLuckyMult(1);
         luckyMultRef.current = 1;
-        trackDiscovery("normal", "Orb Normal", "🔵");
+        trackDiscovery("normal", "Normal Orb", "🔵");
       }
 
       const comboMult = 1 + Math.floor(newCombo / 5) * 0.5;
@@ -1026,7 +1026,7 @@ export function useGame(callbacks: GameCallbacks) {
         setLastMilestone(milestone);
         lastMilestoneRef.current = milestone;
         playMilestone();
-        callbacksRef.current.onFloatText(50, 40, `MARCO ${milestone * 1000}! +${bonus}`, "#22d3ee", 36);
+        callbacksRef.current.onFloatText(50, 40, `MILESTONE ${milestone * 1000}! +${bonus}`, "#22d3ee", 36);
         callbacksRef.current.onFlash("rgba(34,211,238,0.15)");
         callbacksRef.current.onScreenShake(8);
         unlock("milestone_1");
@@ -1037,7 +1037,7 @@ export function useGame(callbacks: GameCallbacks) {
         setLevel(newLevel);
         levelRef.current = newLevel;
         playLevelUp();
-        callbacksRef.current.onFloatText(50, 30, `NÍVEL ${newLevel}`, "#22d3ee", 48);
+        callbacksRef.current.onFloatText(50, 30, `LEVEL ${newLevel}`, "#22d3ee", 48);
         callbacksRef.current.onFlash("rgba(34,211,238,0.15)");
         callbacksRef.current.onScreenShake(8);
         questProgress("level_10", newLevel);
@@ -1047,7 +1047,7 @@ export function useGame(callbacks: GameCallbacks) {
         setChallengeDone(true);
         challengeDoneRef.current = true;
         playChallenge();
-        callbacksRef.current.onFloatText(50, 25, "DESAFIO COMPLETO!", "#22c55e", 40);
+        callbacksRef.current.onFloatText(50, 25, "CHALLENGE COMPLETE!", "#22c55e", 40);
         callbacksRef.current.onFlash("rgba(34,197,94,0.2)");
         callbacksRef.current.onScreenShake(10);
         unlock("challenge_done");
@@ -1187,7 +1187,7 @@ export function useGame(callbacks: GameCallbacks) {
         }
         if (nearMiss) {
           playNearMiss();
-          callbacksRef.current.onFloatText(50, 50, "QUASE!", "#f97316", 28);
+          callbacksRef.current.onFloatText(50, 50, "SO CLOSE!", "#f97316", 28);
         }
         if (missedNormal) {
           resetCombo(true);
