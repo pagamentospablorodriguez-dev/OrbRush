@@ -404,6 +404,20 @@ function App() {
           0%, 100% { transform: scale(1); opacity: 1; }
           50% { transform: scale(1.2); opacity: 0.7; }
         }
+        @keyframes adrenalineBg {
+          0%, 100% { background: radial-gradient(circle at 50% 50%, rgba(239,68,68,0.1), transparent 60%); }
+          50% { background: radial-gradient(circle at 50% 50%, rgba(239,68,68,0.25), transparent 60%); }
+        }
+        @keyframes nudgeShake {
+          0%, 100% { transform: translateX(0); }
+          25% { transform: translateX(-3px); }
+          75% { transform: translateX(3px); }
+        }
+        @keyframes firstWinPop {
+          0% { transform: scale(0) rotate(-10deg); opacity: 0; }
+          60% { transform: scale(1.2) rotate(5deg); opacity: 1; }
+          100% { transform: scale(1) rotate(0); opacity: 1; }
+        }
       `}</style>
 
       <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none z-30" />
@@ -418,6 +432,9 @@ function App() {
 
       {game.gameState === "playing" && game.lives === 1 && (
         <div className="absolute inset-0 z-0 pointer-events-none" style={{ animation: "dangerPulse 0.8s ease-in-out infinite" }} />
+      )}
+      {game.adrenaline && (
+        <div className="absolute inset-0 z-0 pointer-events-none" style={{ animation: "adrenalineBg 0.6s ease-in-out infinite" }} />
       )}
 
       <div id="game-area" className="absolute inset-0 z-10" style={shakeStyle}>
@@ -509,6 +526,11 @@ function App() {
               <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-fuchsia-500/15 border border-fuchsia-400/30 text-fuchsia-300 text-sm font-bold mb-3">
                 <Gem className="w-4 h-4" /> {gems.toLocaleString()} gemas
               </div>
+              {game.sessionStreak > 1 && (
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-500/15 border border-cyan-400/30 text-cyan-300 text-sm font-bold mb-3">
+                  <Flame className="w-4 h-4" fill="currentColor" /> Sequência: {game.sessionStreak} partidas · Próxima: {game.sessionMult.toFixed(1)}x pontos!
+                </div>
+              )}
 
               {/* Active power-ups indicator */}
               {activePowerUpCount > 0 && (
@@ -634,6 +656,21 @@ function App() {
                   <Gem className="w-4 h-4" /> +{game.gems} gemas ganhas!
                 </div>
               )}
+              {game.firstWinToday && (
+                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-300 text-sm font-bold mb-3" style={{ animation: "firstWinPop 500ms ease-out" }}>
+                  <Star className="w-4 h-4" fill="currentColor" /> Primeira vitória do dia! +100 gemas!
+                </div>
+              )}
+              {game.nearRecord && !game.newRecord && (
+                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-orange-500/15 border border-orange-400/40 text-orange-300 text-sm font-bold mb-3" style={{ animation: "nudgeShake 0.5s ease-in-out 3" }}>
+                  <Trophy className="w-4 h-4" /> Você estava a apenas {game.recordGap.toLocaleString()} pontos do recorde!
+                </div>
+              )}
+              {game.sessionStreak > 1 && (
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-500/15 border border-cyan-400/30 text-cyan-300 text-sm font-bold mb-4">
+                  <Flame className="w-4 h-4" fill="currentColor" /> {game.sessionStreak} partidas seguidas · {game.sessionMult.toFixed(1)}x bônus!
+                </div>
+              )}
               <div className="grid grid-cols-3 gap-2 mb-6">
                 <div className="bg-slate-800/60 border border-slate-700 rounded-xl p-3">
                   <Flame className="w-4 h-4 text-orange-400 mx-auto mb-1" />
@@ -698,6 +735,8 @@ function App() {
                   Recorde: {Math.max(game.highScore, game.score).toLocaleString()}
                   {game.prestige > 0 && <span className="text-amber-300 ml-1">· P{game.prestige}</span>}
                   {game.doublePoints && <span className="text-fuchsia-300 ml-1">· 2x</span>}
+                  {game.adrenaline && <span className="text-red-400 ml-1 font-bold">· ADRENALINA 1.5x</span>}
+                  {game.sessionMult > 1 && <span className="text-cyan-300 ml-1">· Sessão {game.sessionMult.toFixed(1)}x</span>}
                 </div>
               </div>
 
@@ -824,6 +863,26 @@ function App() {
               <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-fuchsia-500/20 border-2 border-fuchsia-400/50 backdrop-blur-sm">
                 <Sparkles className="w-4 h-4 text-fuchsia-300" />
                 <span className="text-sm font-black text-fuchsia-300">2x PONTOS · {game.doubleTimeLeft}s</span>
+              </div>
+            </div>
+          )}
+
+          {/* Adrenaline indicator */}
+          {game.adrenaline && (
+            <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-20 pointer-events-none">
+              <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-red-500/20 border-2 border-red-400/50 backdrop-blur-sm" style={{ animation: "pulseGlow 0.5s ease-in-out infinite" }}>
+                <Zap className="w-4 h-4 text-red-400" fill="currentColor" />
+                <span className="text-sm font-black text-red-300">ADRENALINA 1.5x</span>
+              </div>
+            </div>
+          )}
+
+          {/* Near-record teaser */}
+          {game.score > 0 && game.highScore > 0 && game.score < game.highScore && (game.highScore - game.score) <= 500 && (
+            <div className="absolute bottom-32 left-1/2 -translate-x-1/2 z-20 pointer-events-none">
+              <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/15 border border-amber-400/40" style={{ animation: "nudgeShake 0.5s ease-in-out 3" }}>
+                <Trophy className="w-3.5 h-3.5 text-amber-400" />
+                <span className="text-xs font-bold text-amber-300">Faltam {(game.highScore - game.score).toLocaleString()} pts pro recorde!</span>
               </div>
             </div>
           )}
