@@ -303,3 +303,29 @@ export function playStreakBonus() {
   const notes = [784, 988, 1318, 1568];
   notes.forEach((n, i) => tone(n, 0.1, "triangle", 0.15, i * 0.04));
 }
+
+export function playChestTease() {
+  tone(660, 0.05, "sine", 0.06);
+}
+
+export function playChestReveal() {
+  tone(880, 0.1, "triangle", 0.15);
+  tone(1108, 0.1, "triangle", 0.15, 0.06);
+  tone(1318, 0.2, "sine", 0.12, 0.12);
+}
+
+export function playSocialNotification() {
+  tone(784, 0.06, "sine", 0.08);
+  tone(988, 0.08, "sine", 0.06, 0.04);
+}
+
+export function playCollectionNew() {
+  const notes = [659, 784, 988, 1318, 1568];
+  notes.forEach((n, i) => tone(n, 0.1, "triangle", 0.18, i * 0.04));
+}
+
+export function playLossChase() {
+  tone(440, 0.1, "sawtooth", 0.12, 0, 660);
+  tone(660, 0.15, "triangle", 0.15, 0.08, 880);
+  tone(880, 0.2, "triangle", 0.18, 0.16);
+}
