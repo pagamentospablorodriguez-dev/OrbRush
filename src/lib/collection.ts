@@ -10,19 +10,19 @@ export interface CollectionEntry {
 }
 
 export const COLLECTION_DEFS: { type: OrbType; label: string; icon: string; color: string }[] = [
-  { type: "normal", label: "Orb Normal", icon: "🔵", color: "#22d3ee" },
-  { type: "golden", label: "Orb Dourado", icon: "🌟", color: "#fbbf24" },
-  { type: "bonus", label: "Orb Bônus", icon: "✨", color: "#a855f7" },
-  { type: "frenzy", label: "Orb Frenesi", icon: "⚡", color: "#f97316" },
-  { type: "mystery", label: "Orb Mistério", icon: "❓", color: "#e879f9" },
-  { type: "shield", label: "Orb Escudo", icon: "🛡️", color: "#3b82f6" },
-  { type: "comeback", label: "Orb Comeback", icon: "📈", color: "#22c55e" },
-  { type: "rainbow", label: "Orb Arco-Íris", icon: "🌈", color: "#e879f9" },
-  { type: "boss", label: "Orb Chefe", icon: "⚔️", color: "#ef4444" },
-  { type: "timefreeze", label: "Orb Congelamento", icon: "❄️", color: "#7dd3fc" },
-  { type: "chain", label: "Orb Cadeia", icon: "🔗", color: "#fbbf24" },
-  { type: "ghost", label: "Orb Fantasma", icon: "👻", color: "#cbd5e1" },
-  { type: "treasure", label: "Orb Tesouro", icon: "💎", color: "#fbbf24" },
+  { type: "normal", label: "Normal Orb", icon: "🔵", color: "#22d3ee" },
+  { type: "golden", label: "Golden Orb", icon: "🌟", color: "#fbbf24" },
+  { type: "bonus", label: "Bonus Orb", icon: "✨", color: "#a855f7" },
+  { type: "frenzy", label: "Frenzy Orb", icon: "⚡", color: "#f97316" },
+  { type: "mystery", label: "Mystery Orb", icon: "❓", color: "#e879f9" },
+  { type: "shield", label: "Shield Orb", icon: "🛡️", color: "#3b82f6" },
+  { type: "comeback", label: "Comeback Orb", icon: "📈", color: "#22c55e" },
+  { type: "rainbow", label: "Rainbow Orb", icon: "🌈", color: "#e879f9" },
+  { type: "boss", label: "Boss Orb", icon: "⚔️", color: "#ef4444" },
+  { type: "timefreeze", label: "Freeze Orb", icon: "❄️", color: "#7dd3fc" },
+  { type: "chain", label: "Chain Orb", icon: "🔗", color: "#fbbf24" },
+  { type: "ghost", label: "Ghost Orb", icon: "👻", color: "#cbd5e1" },
+  { type: "treasure", label: "Treasure Orb", icon: "💎", color: "#fbbf24" },
 ];
 
 const STORAGE_KEY = "orbrush_collection";
