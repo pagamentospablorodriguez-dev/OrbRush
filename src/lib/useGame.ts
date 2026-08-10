@@ -16,12 +16,24 @@ import {
   playComeback,
   playNearMiss,
   playProgressiveTick,
-  playBigWin,
   playPrestige,
   playChallenge,
   playHeartbeat,
   startDrone,
   stopDrone,
+  playChain,
+  playTimeFreeze,
+  playBoss,
+  playBossDefeated,
+  playRainbow,
+  playLuckyStreak,
+  playRevive,
+  playMegaCombo,
+  playTreasureOpen,
+  playMilestone,
+  playSoClose,
+  playStreakBonus,
+  playGhost,
 } from "./sound";
 
 export type OrbType =
@@ -32,7 +44,13 @@ export type OrbType =
   | "frenzy"
   | "mystery"
   | "shield"
-  | "comeback";
+  | "comeback"
+  | "rainbow"
+  | "boss"
+  | "timefreeze"
+  | "chain"
+  | "ghost"
+  | "treasure";
 
 export interface Orb {
   id: number;
@@ -43,6 +61,8 @@ export interface Orb {
   bornAt: number;
   ttl: number;
   pulse: number;
+  hp?: number;
+  maxHp?: number;
 }
 
 export interface Achievement {
@@ -50,6 +70,14 @@ export interface Achievement {
   title: string;
   desc: string;
   icon: string;
+}
+
+export interface PowerUps {
+  shield: boolean;
+  extra_life: boolean;
+  frenzy: boolean;
+  double: boolean;
+  freeze: boolean;
 }
 
 const ACHIEVEMENTS: Achievement[] = [
@@ -74,9 +102,22 @@ const ACHIEVEMENTS: Achievement[] = [
   { id: "comeback_1", title: "Comeback!", desc: "Recuperou do perigo", icon: "💥" },
   { id: "prestige_1", title: "PRESTÍGIO!", desc: "Renasceu mais forte", icon: "🌟" },
   { id: "challenge_done", title: "Desafio Diário!", desc: "Completou o desafio de hoje", icon: "🎯" },
+  { id: "rainbow_1", title: "Arco-Íris!", desc: "Orb arco-íris capturado", icon: "🌈" },
+  { id: "boss_1", title: "Caçador de Chefes", desc: "Derrotou um chefe", icon: "👹" },
+  { id: "timefreeze_1", title: "Tempo Congelado", desc: "Parou o tempo!", icon: "❄️" },
+  { id: "chain_1", title: "Reação em Cadeia", desc: "Cadeia explosiva!", icon: "🔗" },
+  { id: "ghost_1", title: "Fantasma", desc: "Capturou um orb fantasma", icon: "👻" },
+  { id: "treasure_1", title: "Tesouro!", desc: "Abriu um baú", icon: "💎" },
+  { id: "revive_1", title: "Segunda Chance", desc: "Reviveu!", icon: "❤️" },
+  { id: "milestone_1", title: "Marcos", desc: "Bônus de mil pontos!", icon: "🏁" },
+  { id: "lucky_5", title: "Sorte!", desc: "5 dourados seguidos", icon: "🍀" },
+  { id: "lucky_time", title: "Hora da Sorte!", desc: "Chuva de dourados!", icon: "🌟" },
 ];
 
 const REWARD_WORDS = ["BOM!", "ÓTIMO!", "INCRÍVEL!", "PERFEITO!", "INSANO!", "LENDA!", "DEUS!"];
+
+const MILESTONE_STEP = 1000;
+const COMBO_WINDOW = 1600;
 
 interface GameCallbacks {
   onBurst: (x: number, y: number, count: number, color: string, opts?: any) => void;
@@ -85,6 +126,7 @@ interface GameCallbacks {
   onAchievement: (a: Achievement) => void;
   onScreenShake: (intensity: number) => void;
   onFlash: (color: string) => void;
+  onQuestProgress?: (type: string, value: number, incremental?: boolean) => void;
 }
 
 export function useGame(callbacks: GameCallbacks) {
@@ -111,12 +153,31 @@ export function useGame(callbacks: GameCallbacks) {
   const [challengeTarget, setChallengeTarget] = useState(0);
   const [challengeDone, setChallengeDone] = useState(false);
   const [newRecord, setNewRecord] = useState(false);
+  const [timeFreeze, setTimeFreeze] = useState(false);
+  const [timeFreezeTime, setTimeFreezeTime] = useState(0);
+  const [luckyStreak, setLuckyStreak] = useState(0);
+  const [luckyMult, setLuckyMult] = useState(1);
+  const [bossActive, setBossActive] = useState(false);
+  const [canRevive, setCanRevive] = useState(true);
+  const [lastMilestone, setLastMilestone] = useState(0);
+  const [comboDecay, setComboDecay] = useState(0);
+  const [luckyTime, setLuckyTime] = useState(false);
+  const [luckyTimeLeft, setLuckyTimeLeft] = useState(0);
+  const [doublePoints, setDoublePoints] = useState(false);
+  const [doubleTimeLeft, setDoubleTimeLeft] = useState(0);
+  const [gems, setGems] = useState(0);
+  const [autoRestartCountdown, setAutoRestartCountdown] = useState(0);
 
   const orbIdRef = useRef(0);
   const comboTimerRef = useRef<number | null>(null);
+  const comboDecayRef = useRef<number | null>(null);
   const spawnTimerRef = useRef<number | null>(null);
   const frenzyTimerRef = useRef<number | null>(null);
   const comebackTimerRef = useRef<number | null>(null);
+  const freezeTimerRef = useRef<number | null>(null);
+  const luckyTimerRef = useRef<number | null>(null);
+  const doubleTimerRef = useRef<number | null>(null);
+  const autoRestartRef = useRef<number | null>(null);
   const droneRef = useRef(false);
   const unlockedRef = useRef<Set<string>>(new Set());
   const stateRef = useRef(gameState);
@@ -135,6 +196,15 @@ export function useGame(callbacks: GameCallbacks) {
   const progressiveRef = useRef(0);
   const challengeTargetRef = useRef(0);
   const challengeDoneRef = useRef(false);
+  const freezeRef = useRef(false);
+  const luckyStreakRef = useRef(0);
+  const luckyMultRef = useRef(1);
+  const bossActiveRef = useRef(false);
+  const canReviveRef = useRef(true);
+  const lastMilestoneRef = useRef(0);
+  const luckyTimeRef = useRef(false);
+  const doublePointsRef = useRef(false);
+  const gemsRef = useRef(0);
   const callbacksRef = useRef(callbacks);
   callbacksRef.current = callbacks;
 
@@ -155,8 +225,21 @@ export function useGame(callbacks: GameCallbacks) {
     progressiveRef.current = progressiveJackpot;
     challengeTargetRef.current = challengeTarget;
     challengeDoneRef.current = challengeDone;
+    freezeRef.current = timeFreeze;
+    luckyStreakRef.current = luckyStreak;
+    luckyMultRef.current = luckyMult;
+    bossActiveRef.current = bossActive;
+    canReviveRef.current = canRevive;
+    lastMilestoneRef.current = lastMilestone;
+    luckyTimeRef.current = luckyTime;
+    doublePointsRef.current = doublePoints;
+    gemsRef.current = gems;
   };
   syncRefs();
+
+  const questProgress = useCallback((type: string, value: number, incremental?: boolean) => {
+    callbacksRef.current.onQuestProgress?.(type, value, incremental);
+  }, []);
 
   const unlock = useCallback((id: string) => {
     if (unlockedRef.current.has(id)) return;
@@ -184,6 +267,7 @@ export function useGame(callbacks: GameCallbacks) {
     if (scoreRef.current >= 10000) unlock("score_10k");
     if (scoreRef.current >= 50000) unlock("score_50k");
     if (challengeDoneRef.current) unlock("challenge_done");
+    if (luckyStreakRef.current >= 5) unlock("lucky_5");
   }, [unlock]);
 
   const spawnOrb = useCallback(() => {
@@ -192,13 +276,19 @@ export function useGame(callbacks: GameCallbacks) {
     const r = Math.random();
     let type: OrbType = "normal";
 
-    const goldenChance = 0.06 + lvl * 0.003;
-    const bombChance = Math.min(0.04 + lvl * 0.005, 0.16);
+    const goldenChance = luckyTimeRef.current ? 0.35 : 0.06 + lvl * 0.003;
+    const bombChance = luckyTimeRef.current ? 0.02 : Math.min(0.04 + lvl * 0.005, 0.16);
     const bonusChance = 0.05;
     const frenzyChance = frenzyRef.current ? 0 : 0.01;
     const mysteryChance = 0.03;
     const shieldChance = hasShieldRef.current ? 0 : 0.008;
     const comebackChance = livesRef.current <= 1 && !comebackRef.current ? 0.025 : 0;
+    const rainbowChance = 0.004 + lvl * 0.0005;
+    const bossChance = bossActiveRef.current ? 0 : (lvl >= 3 ? 0.003 + lvl * 0.0005 : 0);
+    const freezeChance = freezeRef.current ? 0 : 0.006;
+    const chainChance = 0.012;
+    const ghostChance = 0.015;
+    const treasureChance = 0.005 + lvl * 0.0005;
 
     let acc = 0;
     if (r < (acc += goldenChance)) type = "golden";
@@ -208,6 +298,12 @@ export function useGame(callbacks: GameCallbacks) {
     else if (r < (acc += mysteryChance)) type = "mystery";
     else if (r < (acc += shieldChance)) type = "shield";
     else if (r < (acc += comebackChance)) type = "comeback";
+    else if (r < (acc += rainbowChance)) type = "rainbow";
+    else if (r < (acc += bossChance)) type = "boss";
+    else if (r < (acc += freezeChance)) type = "timefreeze";
+    else if (r < (acc += chainChance)) type = "chain";
+    else if (r < (acc += ghostChance)) type = "ghost";
+    else if (r < (acc += treasureChance)) type = "treasure";
 
     const size =
       type === "golden" ? 70 :
@@ -217,12 +313,21 @@ export function useGame(callbacks: GameCallbacks) {
       type === "mystery" ? 68 :
       type === "shield" ? 72 :
       type === "comeback" ? 78 :
+      type === "rainbow" ? 80 :
+      type === "boss" ? 110 :
+      type === "timefreeze" ? 74 :
+      type === "chain" ? 76 :
+      type === "ghost" ? 62 :
+      type === "treasure" ? 85 :
       55 + Math.random() * 20;
 
     const ttl =
       type === "bomb" ? Math.max(700, 2200 - lvl * 60) :
       type === "golden" ? Math.max(700, 1400 - lvl * 30) :
       type === "comeback" ? 2500 :
+      type === "boss" ? 6000 :
+      type === "treasure" ? 3500 :
+      type === "ghost" ? 3000 :
       Math.max(700, 1800 - lvl * 50);
 
     const margin = 8;
@@ -235,6 +340,8 @@ export function useGame(callbacks: GameCallbacks) {
       bornAt: performance.now(),
       ttl,
       pulse: Math.random() * Math.PI * 2,
+      hp: type === "boss" ? 5 + Math.floor(lvl / 3) : undefined,
+      maxHp: type === "boss" ? 5 + Math.floor(lvl / 3) : undefined,
     };
     setOrbs((prev) => [...prev, orb]);
   }, []);
@@ -258,10 +365,62 @@ export function useGame(callbacks: GameCallbacks) {
     }
     setCombo(0);
     comboRef.current = 0;
+    setLuckyStreak(0);
+    luckyStreakRef.current = 0;
+    setLuckyMult(1);
+    luckyMultRef.current = 1;
+    setComboDecay(0);
     if (comboTimerRef.current) {
       clearTimeout(comboTimerRef.current);
       comboTimerRef.current = null;
     }
+    if (comboDecayRef.current) {
+      cancelAnimationFrame(comboDecayRef.current);
+      comboDecayRef.current = null;
+    }
+  }, []);
+
+  const startLuckyTime = useCallback(() => {
+    setLuckyTime(true);
+    luckyTimeRef.current = true;
+    setLuckyTimeLeft(8);
+    playLuckyStreak();
+    callbacksRef.current.onFlash("rgba(251,191,36,0.3)");
+    callbacksRef.current.onScreenShake(15);
+    callbacksRef.current.onFloatText(50, 50, "HORA DA SORTE!", "#fbbf24", 52);
+    unlock("lucky_time");
+    if (luckyTimerRef.current) clearInterval(luckyTimerRef.current);
+    luckyTimerRef.current = window.setInterval(() => {
+      setLuckyTimeLeft((t) => {
+        if (t <= 1) {
+          setLuckyTime(false);
+          luckyTimeRef.current = false;
+          if (luckyTimerRef.current) clearInterval(luckyTimerRef.current);
+          return 0;
+        }
+        return t - 1;
+      });
+    }, 1000);
+  }, [unlock]);
+
+  const startDoublePoints = useCallback(() => {
+    setDoublePoints(true);
+    doublePointsRef.current = true;
+    setDoubleTimeLeft(10);
+    playWhoosh();
+    callbacksRef.current.onFlash("rgba(168,85,247,0.2)");
+    if (doubleTimerRef.current) clearInterval(doubleTimerRef.current);
+    doubleTimerRef.current = window.setInterval(() => {
+      setDoubleTimeLeft((t) => {
+        if (t <= 1) {
+          setDoublePoints(false);
+          doublePointsRef.current = false;
+          if (doubleTimerRef.current) clearInterval(doubleTimerRef.current);
+          return 0;
+        }
+        return t - 1;
+      });
+    }, 1000);
   }, []);
 
   const endGame = useCallback(() => {
@@ -273,7 +432,11 @@ export function useGame(callbacks: GameCallbacks) {
     if (spawnTimerRef.current) { clearTimeout(spawnTimerRef.current); spawnTimerRef.current = null; }
     if (frenzyTimerRef.current) { clearInterval(frenzyTimerRef.current); frenzyTimerRef.current = null; }
     if (comebackTimerRef.current) { clearInterval(comebackTimerRef.current); comebackTimerRef.current = null; }
+    if (freezeTimerRef.current) { clearInterval(freezeTimerRef.current); freezeTimerRef.current = null; }
+    if (luckyTimerRef.current) { clearInterval(luckyTimerRef.current); luckyTimerRef.current = null; }
+    if (doubleTimerRef.current) { clearInterval(doubleTimerRef.current); doubleTimerRef.current = null; }
     if (comboTimerRef.current) { clearTimeout(comboTimerRef.current); comboTimerRef.current = null; }
+    if (comboDecayRef.current) { cancelAnimationFrame(comboDecayRef.current); comboDecayRef.current = null; }
     setOrbs([]);
     setFrenzy(false);
     frenzyRef.current = false;
@@ -281,6 +444,15 @@ export function useGame(callbacks: GameCallbacks) {
     comebackRef.current = false;
     setHasShield(false);
     hasShieldRef.current = false;
+    setTimeFreeze(false);
+    freezeRef.current = false;
+    setBossActive(false);
+    bossActiveRef.current = false;
+    setLuckyTime(false);
+    luckyTimeRef.current = false;
+    setDoublePoints(false);
+    doublePointsRef.current = false;
+    setComboDecay(0);
 
     const finalScore = scoreRef.current;
     if (finalScore > highScoreRef.current) {
@@ -290,14 +462,40 @@ export function useGame(callbacks: GameCallbacks) {
     }
     setTotalGames((g) => g + 1);
 
-    // Prestige check: at 20k score, auto-prestige
+    // Quest progress: games played
+    questProgress("games_3", 1, true);
+    questProgress("games_5", 1, true);
+    // Quest progress: score
+    questProgress("score_2000", finalScore);
+    questProgress("score_5000", finalScore);
+    // Quest progress: combo
+    questProgress("combo_20", bestCombo);
+    questProgress("combo_40", bestCombo);
+    // Quest progress: golden
+    questProgress("golden_10", totalGoldenRef.current);
+    questProgress("golden_20", totalGoldenRef.current);
+    // Quest progress: level
+    questProgress("level_10", levelRef.current);
+
     if (finalScore >= 20000) {
       setPrestige((p) => p + 1);
       prestigeRef.current += 1;
       playPrestige();
       unlock("prestige_1");
     }
-  }, [unlock]);
+
+    // Auto-restart countdown — 10 seconds
+    setAutoRestartCountdown(10);
+    autoRestartRef.current = window.setInterval(() => {
+      setAutoRestartCountdown((c) => {
+        if (c <= 1) {
+          if (autoRestartRef.current) clearInterval(autoRestartRef.current);
+          return 0;
+        }
+        return c - 1;
+      });
+    }, 1000);
+  }, [unlock, questProgress, bestCombo]);
 
   const startFrenzy = useCallback(() => {
     setFrenzy(true);
@@ -342,6 +540,45 @@ export function useGame(callbacks: GameCallbacks) {
     }, 1000);
   }, [unlock]);
 
+  const startTimeFreeze = useCallback(() => {
+    setTimeFreeze(true);
+    freezeRef.current = true;
+    setTimeFreezeTime(5);
+    playTimeFreeze();
+    callbacksRef.current.onFlash("rgba(125,211,252,0.2)");
+    unlock("timefreeze_1");
+    setOrbs((prev) => prev.map((o) => ({ ...o, bornAt: o.bornAt + 5000 })));
+    if (freezeTimerRef.current) clearInterval(freezeTimerRef.current);
+    freezeTimerRef.current = window.setInterval(() => {
+      setTimeFreezeTime((t) => {
+        if (t <= 1) {
+          setTimeFreeze(false);
+          freezeRef.current = false;
+          if (freezeTimerRef.current) clearInterval(freezeTimerRef.current);
+          return 0;
+        }
+        return t - 1;
+      });
+    }, 1000);
+  }, [unlock]);
+
+  const revive = useCallback(() => {
+    if (!canReviveRef.current) return;
+    setCanRevive(false);
+    canReviveRef.current = false;
+    if (autoRestartRef.current) { clearInterval(autoRestartRef.current); autoRestartRef.current = null; }
+    setAutoRestartCountdown(0);
+    setLives(1);
+    livesRef.current = 1;
+    setGameState("playing");
+    stateRef.current = "playing";
+    playRevive();
+    callbacksRef.current.onFlash("rgba(34,197,94,0.3)");
+    callbacksRef.current.onScreenShake(15);
+    unlock("revive_1");
+    startSpawnLoop();
+  }, [unlock, startSpawnLoop]);
+
   const tapOrb = useCallback(
     (orb: Orb, clientX: number, clientY: number) => {
       if (stateRef.current !== "playing") return;
@@ -349,6 +586,16 @@ export function useGame(callbacks: GameCallbacks) {
       if (!rect) return;
       const px = ((clientX - rect.left) / rect.width) * 100;
       const py = ((clientY - rect.top) / rect.height) * 100;
+
+      // Boss takes multiple hits
+      if (orb.type === "boss" && orb.hp && orb.hp > 1) {
+        setOrbs((prev) => prev.map((o) => o.id === orb.id ? { ...o, hp: (o.hp ?? 1) - 1 } : o));
+        playBoss();
+        callbacksRef.current.onBurst(px, py, 15, "#ef4444", { speed: 4, size: 4, shape: "square" });
+        callbacksRef.current.onScreenShake(6);
+        callbacksRef.current.onFloatText(px, py, `${(orb.hp ?? 1) - 1}`, "#ef4444", 24);
+        return;
+      }
 
       setOrbs((prev) => prev.filter((o) => o.id !== orb.id));
 
@@ -382,13 +629,72 @@ export function useGame(callbacks: GameCallbacks) {
         return;
       }
 
+      // Chain reaction: pop nearby orbs
+      if (orb.type === "chain") {
+        playChain();
+        callbacksRef.current.onBurst(px, py, 40, "#fbbf24", { speed: 7, size: 5, shape: "star" });
+        callbacksRef.current.onShockwave(px, py, 300, "#fbbf24");
+        callbacksRef.current.onScreenShake(10);
+        unlock("chain_1");
+
+        const chainRadius = 25;
+        setOrbs((prev) => {
+          const chainHits: Orb[] = [];
+          const survivors: Orb[] = [];
+          for (const o of prev) {
+            if (o.id === orb.id) continue;
+            const dist = Math.hypot(o.x - orb.x, o.y - orb.y);
+            if (dist < chainRadius && o.type !== "bomb" && o.type !== "boss") {
+              chainHits.push(o);
+            } else {
+              survivors.push(o);
+            }
+          }
+          chainHits.forEach((o, i) => {
+            setTimeout(() => {
+              const cx = o.x;
+              const cy = o.y;
+              const pts = o.type === "golden" ? 100 : o.type === "rainbow" ? 250 : o.type === "bonus" ? 50 : 20;
+              setScore((s) => { const ns = s + pts; scoreRef.current = ns; return ns; });
+              callbacksRef.current.onBurst(cx, cy, 15, o.type === "golden" ? "#fbbf24" : "#22d3ee", { speed: 5, size: 4, shape: "star" });
+              callbacksRef.current.onFloatText(cx, cy, `+${pts}`, "#fbbf24", 22);
+              playChain();
+            }, i * 80);
+          });
+          return survivors;
+        });
+
+        const newCombo = comboRef.current + 1;
+        setCombo(newCombo);
+        comboRef.current = newCombo;
+        if (newCombo > bestCombo) setBestCombo(newCombo);
+        if (comboTimerRef.current) clearTimeout(comboTimerRef.current);
+        comboTimerRef.current = window.setTimeout(() => resetCombo(true), COMBO_WINDOW);
+        callbacksRef.current.onFloatText(px, py, "CADEIA!", "#fbbf24", 36);
+        return;
+      }
+
       // Combo
       const newCombo = comboRef.current + 1;
       setCombo(newCombo);
       comboRef.current = newCombo;
       if (newCombo > bestCombo) setBestCombo(newCombo);
       if (comboTimerRef.current) clearTimeout(comboTimerRef.current);
-      comboTimerRef.current = window.setTimeout(() => resetCombo(true), 1600);
+      comboTimerRef.current = window.setTimeout(() => resetCombo(true), COMBO_WINDOW);
+
+      // Combo decay bar animation
+      setComboDecay(1);
+      if (comboDecayRef.current) cancelAnimationFrame(comboDecayRef.current);
+      const decayStart = performance.now();
+      const animateDecay = () => {
+        const elapsed = performance.now() - decayStart;
+        const remaining = Math.max(0, 1 - elapsed / COMBO_WINDOW);
+        setComboDecay(remaining);
+        if (remaining > 0 && stateRef.current === "playing") {
+          comboDecayRef.current = requestAnimationFrame(animateDecay);
+        }
+      };
+      comboDecayRef.current = requestAnimationFrame(animateDecay);
 
       // Progressive jackpot grows with every tap
       const progAdd = 2 + Math.floor(newCombo / 10);
@@ -414,6 +720,22 @@ export function useGame(callbacks: GameCallbacks) {
         totalGoldenRef.current = newGolden;
         callbacksRef.current.onShockwave(px, py, 120, "#fbbf24");
         floatText = "+100";
+
+        const newLucky = luckyStreakRef.current + 1;
+        setLuckyStreak(newLucky);
+        luckyStreakRef.current = newLucky;
+        if (newLucky >= 3) {
+          const newMult = 1 + Math.floor(newLucky / 2) * 0.5;
+          setLuckyMult(newMult);
+          luckyMultRef.current = newMult;
+          if (newLucky >= 5) {
+            playLuckyStreak();
+            callbacksRef.current.onFloatText(px, py - 25, `SORTE x${newLucky}!`, "#4ade80", 24);
+            unlock("lucky_5");
+          }
+        }
+        questProgress("golden_10", newGolden);
+        questProgress("golden_20", newGolden);
       } else if (orb.type === "bonus") {
         basePoints = 50;
         color = "#a855f7";
@@ -421,6 +743,10 @@ export function useGame(callbacks: GameCallbacks) {
         particleShape = "square";
         playTap(newCombo);
         floatText = "+50";
+        setLuckyStreak(0);
+        luckyStreakRef.current = 0;
+        setLuckyMult(1);
+        luckyMultRef.current = 1;
       } else if (orb.type === "frenzy") {
         startFrenzy();
         basePoints = 30;
@@ -431,7 +757,6 @@ export function useGame(callbacks: GameCallbacks) {
         callbacksRef.current.onShockwave(px, py, 250, "#f97316");
         callbacksRef.current.onScreenShake(10);
       } else if (orb.type === "mystery") {
-        // Random reward: 10, 50, 100, 200, or jackpot
         const outcomes = [
           { pts: 10, w: 40, label: "+10" },
           { pts: 50, w: 25, label: "+50" },
@@ -473,15 +798,90 @@ export function useGame(callbacks: GameCallbacks) {
         floatText = "COMEBACK!";
         callbacksRef.current.onShockwave(px, py, 250, "#22c55e");
         callbacksRef.current.onScreenShake(12);
+      } else if (orb.type === "rainbow") {
+        basePoints = 250;
+        color = "#e879f9";
+        particleCount = 50;
+        particleShape = "star";
+        playRainbow();
+        floatText = "ARCO-ÍRIS +250!";
+        callbacksRef.current.onShockwave(px, py, 300, "#e879f9");
+        callbacksRef.current.onFlash("rgba(232,121,249,0.2)");
+        callbacksRef.current.onScreenShake(12);
+        unlock("rainbow_1");
+        questProgress("rainbow_1", 1, true);
+      } else if (orb.type === "boss") {
+        basePoints = 500 + levelRef.current * 50;
+        color = "#ef4444";
+        particleCount = 60;
+        particleShape = "square";
+        playBossDefeated();
+        floatText = `CHEFE! +${basePoints}`;
+        callbacksRef.current.onShockwave(px, py, 400, "#ef4444");
+        callbacksRef.current.onFlash("rgba(239,68,68,0.2)");
+        callbacksRef.current.onScreenShake(20);
+        setBossActive(false);
+        bossActiveRef.current = false;
+        unlock("boss_1");
+        questProgress("boss_1", 1, true);
+      } else if (orb.type === "timefreeze") {
+        startTimeFreeze();
+        basePoints = 30;
+        color = "#7dd3fc";
+        particleCount = 35;
+        particleShape = "star";
+        floatText = "TEMPO CONGELADO!";
+        callbacksRef.current.onShockwave(px, py, 280, "#7dd3fc");
+      } else if (orb.type === "ghost") {
+        basePoints = 75;
+        color = "#cbd5e1";
+        particleCount = 25;
+        particleShape = "circle";
+        playGhost();
+        floatText = "FANTASMA +75!";
+        callbacksRef.current.onShockwave(px, py, 180, "#cbd5e1");
+        unlock("ghost_1");
+      } else if (orb.type === "treasure") {
+        const outcomes = [
+          { pts: 200, w: 35, label: "+200" },
+          { pts: 500, w: 25, label: "+500!" },
+          { pts: 1000, w: 20, label: "+1000!!" },
+          { pts: 2000, w: 12, label: "+2000!!!" },
+          { pts: 5000, w: 8, label: "MEGA +5000!!!" },
+        ];
+        const totalW = outcomes.reduce((s, o) => s + o.w, 0);
+        let roll = Math.random() * totalW;
+        let chosen = outcomes[0];
+        for (const o of outcomes) {
+          roll -= o.w;
+          if (roll <= 0) { chosen = o; break; }
+        }
+        basePoints = chosen.pts;
+        color = "#fbbf24";
+        particleCount = 40 + chosen.pts / 20;
+        particleShape = "star";
+        playTreasureOpen();
+        floatText = `TESOURO ${chosen.label}`;
+        callbacksRef.current.onShockwave(px, py, 250 + chosen.pts / 10, "#fbbf24");
+        callbacksRef.current.onFlash("rgba(251,191,36,0.2)");
+        callbacksRef.current.onScreenShake(15);
+        unlock("treasure_1");
+        questProgress("treasure_1", 1, true);
       } else {
         playTap(newCombo);
+        setLuckyStreak(0);
+        luckyStreakRef.current = 0;
+        setLuckyMult(1);
+        luckyMultRef.current = 1;
       }
 
       const comboMult = 1 + Math.floor(newCombo / 5) * 0.5;
       const frenzyMult = frenzyRef.current ? 2 : 1;
       const comebackMult = comebackRef.current ? 3 : 1;
       const prestigeMult = 1 + prestigeRef.current * 0.1;
-      const points = Math.floor(basePoints * comboMult * frenzyMult * comebackMult * prestigeMult);
+      const luckyMultVal = luckyMultRef.current;
+      const doubleMult = doublePointsRef.current ? 2 : 1;
+      const points = Math.floor(basePoints * comboMult * frenzyMult * comebackMult * prestigeMult * luckyMultVal * doubleMult);
 
       const newScore = scoreRef.current + points;
       setScore(newScore);
@@ -491,6 +891,13 @@ export function useGame(callbacks: GameCallbacks) {
       setTotalTaps(newTaps);
       totalTapsRef.current = newTaps;
 
+      // Earn gems: 1 gem per 100 points
+      const gemsEarned = Math.floor(points / 100);
+      if (gemsEarned > 0) {
+        setGems((g) => g + gemsEarned);
+        gemsRef.current += gemsEarned;
+      }
+
       callbacksRef.current.onBurst(px, py, particleCount, color, {
         speed: 5,
         size: 4,
@@ -498,7 +905,7 @@ export function useGame(callbacks: GameCallbacks) {
       });
 
       if (floatText) {
-        callbacksRef.current.onFloatText(px, py, floatText, color, orb.type === "mystery" ? 32 : 30);
+        callbacksRef.current.onFloatText(px, py, floatText, color, orb.type === "mystery" || orb.type === "treasure" ? 32 : 30);
       }
 
       // Random reward word at high combos
@@ -508,7 +915,15 @@ export function useGame(callbacks: GameCallbacks) {
         callbacksRef.current.onScreenShake(5);
       }
 
-      // Jackpot at combo milestones — now includes progressive jackpot
+      // Mega combo celebration at 50+
+      if (newCombo >= 50 && newCombo % 25 === 0) {
+        playMegaCombo();
+        callbacksRef.current.onFlash("rgba(251,191,36,0.15)");
+        callbacksRef.current.onScreenShake(15);
+        callbacksRef.current.onFloatText(50, 50, `MEGA COMBO x${newCombo}!`, "#fbbf24", 52);
+      }
+
+      // Jackpot at combo milestones — includes progressive jackpot
       if (newCombo > 0 && newCombo % 15 === 0) {
         const baseJackpot = 500 * (newCombo / 15);
         const totalJackpot = baseJackpot + progressiveRef.current;
@@ -528,6 +943,23 @@ export function useGame(callbacks: GameCallbacks) {
         const newJp = totalJackpotsRef.current + 1;
         setTotalJackpots(newJp);
         totalJackpotsRef.current = newJp;
+        questProgress("jackpot_1", 1, true);
+        questProgress("jackpot_3", 1, true);
+      }
+
+      // Milestone bonus every 1000 points
+      const milestone = Math.floor(newScore / MILESTONE_STEP);
+      if (milestone > lastMilestoneRef.current) {
+        const milestonesHit = milestone - lastMilestoneRef.current;
+        const bonus = 200 * milestonesHit;
+        setScore((s) => { const ns = s + bonus; scoreRef.current = ns; return ns; });
+        setLastMilestone(milestone);
+        lastMilestoneRef.current = milestone;
+        playMilestone();
+        callbacksRef.current.onFloatText(50, 40, `MARCO ${milestone * 1000}! +${bonus}`, "#22d3ee", 36);
+        callbacksRef.current.onFlash("rgba(34,211,238,0.15)");
+        callbacksRef.current.onScreenShake(8);
+        unlock("milestone_1");
       }
 
       // Level up every 500 points
@@ -539,6 +971,7 @@ export function useGame(callbacks: GameCallbacks) {
         callbacksRef.current.onFloatText(50, 30, `NÍVEL ${newLevel}`, "#22d3ee", 48);
         callbacksRef.current.onFlash("rgba(34,211,238,0.15)");
         callbacksRef.current.onScreenShake(8);
+        questProgress("level_10", newLevel);
       }
 
       // Daily challenge check
@@ -552,31 +985,47 @@ export function useGame(callbacks: GameCallbacks) {
         unlock("challenge_done");
       }
 
+      // Random Lucky Time event trigger (1 in 500 chance per tap after level 3)
+      if (!luckyTimeRef.current && levelRef.current >= 3 && Math.random() < 0.002) {
+        startLuckyTime();
+      }
+
       checkAchievements();
     },
-    [bestCombo, resetCombo, endGame, startFrenzy, startComeback, checkAchievements, unlock],
+    [bestCombo, resetCombo, endGame, startFrenzy, startComeback, startTimeFreeze, startLuckyTime, startDoublePoints, checkAchievements, unlock, questProgress],
   );
 
-  const startGame = useCallback(() => {
+  const startGame = useCallback((powerUps?: PowerUps) => {
     setScore(0);
     setCombo(0);
     setBestCombo(0);
     setLevel(1);
-    setLives(3);
+    setLives(powerUps?.extra_life ? 4 : 3);
     setOrbs([]);
     setFrenzy(false);
     setFrenzyTime(0);
     setTotalTaps(0);
     setTotalGolden(0);
-    setHasShield(false);
-    setComebackActive(false);
-    setComebackTime(0);
     setProgressiveJackpot(0);
     setNewRecord(false);
+    setTimeFreeze(false);
+    setTimeFreezeTime(0);
+    setLuckyStreak(0);
+    setLuckyMult(1);
+    setBossActive(false);
+    setCanRevive(true);
+    setLastMilestone(0);
+    setComboDecay(0);
+    setLuckyTime(false);
+    setLuckyTimeLeft(0);
+    setDoublePoints(false);
+    setDoubleTimeLeft(0);
+    setGems(0);
+    setAutoRestartCountdown(0);
     scoreRef.current = 0;
     comboRef.current = 0;
     levelRef.current = 1;
-    livesRef.current = 3;
+    livesRef.current = powerUps?.extra_life ? 4 : 3;
     frenzyRef.current = false;
     totalTapsRef.current = 0;
     totalGoldenRef.current = 0;
@@ -584,12 +1033,64 @@ export function useGame(callbacks: GameCallbacks) {
     comebackRef.current = false;
     progressiveRef.current = 0;
     droneRef.current = false;
+    freezeRef.current = false;
+    luckyStreakRef.current = 0;
+    luckyMultRef.current = 1;
+    bossActiveRef.current = false;
+    canReviveRef.current = true;
+    lastMilestoneRef.current = 0;
+    luckyTimeRef.current = false;
+    doublePointsRef.current = false;
+    gemsRef.current = 0;
+    if (autoRestartRef.current) { clearInterval(autoRestartRef.current); autoRestartRef.current = null; }
     stopDrone();
+
+    // Apply power-ups
+    if (powerUps?.shield) {
+      setHasShield(true);
+      hasShieldRef.current = true;
+    }
+    if (powerUps?.frenzy) {
+      setFrenzy(true);
+      frenzyRef.current = true;
+      setFrenzyTime(8);
+      frenzyTimerRef.current = window.setInterval(() => {
+        setFrenzyTime((t) => {
+          if (t <= 1) {
+            setFrenzy(false);
+            frenzyRef.current = false;
+            if (frenzyTimerRef.current) clearInterval(frenzyTimerRef.current);
+            return 0;
+          }
+          return t - 1;
+        });
+      }, 1000);
+    }
+    if (powerUps?.freeze) {
+      setTimeFreeze(true);
+      freezeRef.current = true;
+      setTimeFreezeTime(5);
+      freezeTimerRef.current = window.setInterval(() => {
+        setTimeFreezeTime((t) => {
+          if (t <= 1) {
+            setTimeFreeze(false);
+            freezeRef.current = false;
+            if (freezeTimerRef.current) clearInterval(freezeTimerRef.current);
+            return 0;
+          }
+          return t - 1;
+        });
+      }, 1000);
+    }
+    if (powerUps?.double) {
+      startDoublePoints();
+    }
+
     setGameState("playing");
     stateRef.current = "playing";
     playStart();
     startSpawnLoop();
-  }, [startSpawnLoop]);
+  }, [startSpawnLoop, startDoublePoints]);
 
   // Expire orbs that reach their ttl — with near-miss feedback
   useEffect(() => {
@@ -600,6 +1101,7 @@ export function useGame(callbacks: GameCallbacks) {
         const survivors: Orb[] = [];
         let missedNormal = false;
         let nearMiss = false;
+        let bossExpired = false;
         for (const o of prev) {
           if (now - o.bornAt < o.ttl) {
             survivors.push(o);
@@ -608,19 +1110,27 @@ export function useGame(callbacks: GameCallbacks) {
               missedNormal = true;
               if (o.type === "golden") nearMiss = true;
             }
+            if (o.type === "boss") {
+              bossExpired = true;
+            }
           }
         }
         if (nearMiss) {
           playNearMiss();
+          callbacksRef.current.onFloatText(50, 50, "QUASE!", "#f97316", 28);
         }
         if (missedNormal) {
           resetCombo(true);
+        }
+        if (bossExpired) {
+          setBossActive(false);
+          bossActiveRef.current = false;
         }
         return survivors;
       });
     }, 100);
     return () => clearInterval(interval);
-  }, [gameState, resetCombo]);
+  }, [gameState, resetCombo, callbacksRef]);
 
   // Heartbeat sound at 1 life
   useEffect(() => {
@@ -656,6 +1166,19 @@ export function useGame(callbacks: GameCallbacks) {
     challengeTarget,
     challengeDone,
     newRecord,
+    timeFreeze,
+    timeFreezeTime,
+    luckyStreak,
+    luckyMult,
+    bossActive,
+    canRevive,
+    comboDecay,
+    luckyTime,
+    luckyTimeLeft,
+    doublePoints,
+    doubleTimeLeft,
+    gems,
+    autoRestartCountdown,
     setHighScore,
     setDailyStreak,
     setPrestige,
@@ -666,5 +1189,6 @@ export function useGame(callbacks: GameCallbacks) {
     tapOrb,
     startGame,
     endGame,
+    revive,
   };
 }
