@@ -813,9 +813,9 @@ function App() {
       )}
 
       {/* Mute button */}
-      <button onClick={toggleMute} className="absolute top-3 left-3 z-50 w-9 h-9 rounded-full bg-slate-800/80 border border-slate-700 flex items-center justify-center text-slate-300 hover:text-white hover:bg-slate-700 transition-colors">
-        {muted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-      </button>
+<button onClick={toggleMute} className="absolute top-3 right-3 translate-y-[10px] z-50 w-9 h-9 rounded-full bg-slate-800/80 border border-slate-700 flex items-center justify-center text-slate-300 hover:text-white hover:bg-slate-700 transition-colors">
+  {muted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+</button>
 
       {/* Achievement popups */}
       <div className="absolute top-16 right-3 z-50 flex flex-col gap-2 pointer-events-none">
