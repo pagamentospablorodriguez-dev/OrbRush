@@ -1,12 +1,16 @@
 import { createClient } from "@supabase/supabase-js";
+import { getDeviceId } from "./deviceId";
 
 const url = import.meta.env.VITE_SUPABASE_URL;
 const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 export const supabase = createClient(url, anonKey);
 
+const deviceId = getDeviceId();
+
 export interface PlayerStats {
   id: number;
+  device_id: string;
   high_score: number;
   best_combo: number;
   total_taps: number;
@@ -52,24 +56,82 @@ export interface PlayerStats {
   power_freeze: boolean;
 }
 
+const DEFAULT_STATS: Omit<PlayerStats, "id" | "device_id"> = {
+  high_score: 0,
+  best_combo: 0,
+  total_taps: 0,
+  total_golden: 0,
+  current_level: 1,
+  daily_streak: 0,
+  last_played_date: null,
+  prestige: 0,
+  total_games: 0,
+  total_jackpots: 0,
+  best_comeback: 0,
+  daily_challenge_target: 0,
+  daily_challenge_progress: 0,
+  daily_challenge_date: null,
+  total_revives: 0,
+  total_bosses: 0,
+  total_treasures: 0,
+  total_rainbows: 0,
+  total_chains: 0,
+  best_streak_bonus: 0,
+  lucky_streak: 0,
+  gems: 0,
+  quest_date: null,
+  quest1_type: "",
+  quest1_progress: 0,
+  quest1_target: 0,
+  quest1_done: false,
+  quest2_type: "",
+  quest2_progress: 0,
+  quest2_target: 0,
+  quest2_done: false,
+  quest3_type: "",
+  quest3_progress: 0,
+  quest3_target: 0,
+  quest3_done: false,
+  wheel_date: null,
+  total_chests: 0,
+  best_rarity: 0,
+  power_shield: false,
+  power_extra_life: false,
+  power_frenzy: false,
+  power_double: false,
+  power_freeze: false,
+};
+
 export async function loadStats(): Promise<PlayerStats | null> {
   const { data, error } = await supabase
     .from("player_stats")
     .select("*")
-    .eq("id", 1)
+    .eq("device_id", deviceId)
     .maybeSingle();
   if (error) {
     console.error("Failed to load stats:", error);
     return null;
   }
-  return data as PlayerStats | null;
+  if (data) return data as PlayerStats;
+
+  // New player — create a row with zeroed defaults
+  const { data: inserted, error: insertError } = await supabase
+    .from("player_stats")
+    .insert({ device_id: deviceId, ...DEFAULT_STATS })
+    .select()
+    .maybeSingle();
+  if (insertError) {
+    console.error("Failed to create player stats:", insertError);
+    return null;
+  }
+  return inserted as PlayerStats | null;
 }
 
 export async function saveStats(stats: Partial<PlayerStats>): Promise<void> {
   const { error } = await supabase
     .from("player_stats")
     .update({ ...stats, updated_at: new Date().toISOString() })
-    .eq("id", 1);
+    .eq("device_id", deviceId);
   if (error) console.error("Failed to save stats:", error);
 }
 
@@ -78,7 +140,7 @@ export async function updateDailyStreak(): Promise<{ streak: number; isFirstPlay
   const { data, error } = await supabase
     .from("player_stats")
     .select("daily_streak, last_played_date")
-    .eq("id", 1)
+    .eq("device_id", deviceId)
     .maybeSingle();
   if (error) {
     console.error("Failed to load streak:", error);
@@ -110,7 +172,7 @@ export async function rollDailyChallenge(): Promise<{ target: number; isNew: boo
   const { data, error } = await supabase
     .from("player_stats")
     .select("daily_challenge_target, daily_challenge_date, daily_challenge_progress")
-    .eq("id", 1)
+    .eq("device_id", deviceId)
     .maybeSingle();
   if (error) {
     console.error("Failed to load challenge:", error);
@@ -140,7 +202,7 @@ export async function rollDailyQuests(): Promise<PlayerStats | null> {
   const { data } = await supabase
     .from("player_stats")
     .select("quest_date, quest1_type, quest2_type, quest3_type")
-    .eq("id", 1)
+    .eq("device_id", deviceId)
     .maybeSingle();
 
   if (data?.quest_date === today && data.quest1_type) {
@@ -249,7 +311,7 @@ export async function canSpinWheel(): Promise<boolean> {
   const { data } = await supabase
     .from("player_stats")
     .select("wheel_date")
-    .eq("id", 1)
+    .eq("device_id", deviceId)
     .maybeSingle();
   return data?.wheel_date !== today;
 }
