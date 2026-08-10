@@ -34,3 +34,16 @@ export function rollChest(): ChestReward {
 export function rarityIndex(r: ChestRarity): number {
   return RARITY_ORDER.indexOf(r);
 }
+
+// Near-miss tease: returns a sequence of rarities that ends on the real one,
+// but passes through higher rarities first to create the "almost!" feeling.
+export function rollChestWithTease(): { reward: ChestReward; teaseSequence: ChestRarity[] } {
+  const reward = rollChest();
+  const teaseSequence: ChestRarity[] = [];
+  const teaseCount = 5 + Math.floor(Math.random() * 4);
+  for (let i = 0; i < teaseCount; i++) {
+    teaseSequence.push(RARITY_ORDER[Math.floor(Math.random() * RARITY_ORDER.length)]);
+  }
+  teaseSequence.push(reward.rarity);
+  return { reward, teaseSequence };
+}
