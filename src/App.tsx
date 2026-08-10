@@ -1,7 +1,5 @@
 //Bune
 
-
-
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Play, RotateCcw, Volume2, VolumeX, Flame, Star, Heart, Zap, Trophy, Target,
@@ -24,6 +22,8 @@ import { POWER_UPS } from "@/lib/shop";
 import { getCollectionEntries, getCollectionStats, type CollectionEntry } from "@/lib/collection";
 import { rollSocialNotification, randomSocialDelay, type SocialNotification } from "@/lib/social";
 import { getLossChaseBonus, type LossChaseBonus } from "@/lib/lossChase";
+import { isPremium, incrementPlayCount, hasPaywallBeenShown, setPaywallShown, resetPaywallState } from "@/lib/premium";
+import { PaywallModal } from "@/components/PaywallModal";
 
 const ORB_COLORS: Record<string, { bg: string; border: string; glow: string }> = {
   normal: { bg: "from-cyan-400 to-blue-500", border: "border-cyan-300", glow: "shadow-cyan-400/50" },
@@ -78,6 +78,8 @@ function App() {
   const [lossChase, setLossChase] = useState<LossChaseBonus>({ active: false, multiplier: 1, secondsLeft: 0, reason: "" });
   const [showStreakWarning, setShowStreakWarning] = useState(false);
   const [collectionPopup, setCollectionPopup] = useState<{ label: string; icon: string } | null>(null);
+  const [showPaywall, setShowPaywall] = useState(false);
+  const [premium, setPremiumState] = useState(isPremium());
   const shakeTimerRef = useRef<number | null>(null);
   const flashTimerRef = useRef<number | null>(null);
 
@@ -194,6 +196,17 @@ function App() {
       setActivePowerUps({ shield: false, extra_life: false, frenzy: false, double: false, freeze: false });
       setPowerUps({ shield: false, extra_life: false, frenzy: false, double: false, freeze: false });
       refreshQuests();
+
+      // Paywall logic: show after 3 games for non-premium users
+      if (!premium) {
+        const playCount = incrementPlayCount();
+        if (playCount >= 3 && !hasPaywallBeenShown()) {
+          setTimeout(() => {
+            setShowPaywall(true);
+            setPaywallShown(true);
+          }, 1200);
+        }
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game.gameState]);
@@ -318,7 +331,7 @@ function App() {
       setActivePowerUps((p) => ({ ...p, [key]: true }));
       setGems((g) => Math.max(0, g - cost));
     } else {
-      setBuyError("Gemas insuficientes!");
+      setBuyError("Not enough gems!");
       setTimeout(() => setBuyError(null), 2000);
     }
   };
@@ -329,6 +342,12 @@ function App() {
   };
 
   const closeModal = () => { setModal(null); setChestReward(null); setWheelResult(null); setBuyError(null); setChestTeaseIndex(-1); };
+
+  const handlePaywallActivated = () => {
+    setPremiumState(true);
+    setShowPaywall(false);
+    resetPaywallState();
+  };
 
   const shakeStyle = shake > 0 ? { animation: `shake 300ms ease-out` } : undefined;
   const activePowerUpCount = Object.values(activePowerUps).filter(Boolean).length;
@@ -425,7 +444,7 @@ function App() {
               {showStreakWarning && game.dailyStreak >= 2 && (
                 <div className="mb-4 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-orange-500/15 border border-orange-400/40 text-orange-300 text-sm font-bold" style={{ animation: "streakWarningPulse 1.5s ease-in-out infinite" }}>
                   <AlertTriangle className="w-4 h-4" />
-                  Você tem {game.dailyStreak} dias de sequência! Não perca!
+                  You're on a {game.dailyStreak}-day streak! Don't lose it!
                 </div>
               )}
 
@@ -440,52 +459,52 @@ function App() {
 
               {game.prestige > 0 && (
                 <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/15 border border-amber-400/30 text-amber-300 text-sm font-bold mb-3">
-                  <Crown className="w-4 h-4" /> Prestígio {game.prestige} · +{Math.round(game.prestige * 10)}% pontos
+                  <Crown className="w-4 h-4" /> Prestige {game.prestige} · +{Math.round(game.prestige * 10)}% points
                 </div>
               )}
               <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-fuchsia-500/15 border border-fuchsia-400/30 text-fuchsia-300 text-sm font-bold mb-3">
-                <Gem className="w-4 h-4" /> {gems.toLocaleString()} gemas
+                <Gem className="w-4 h-4" /> {gems.toLocaleString()} gems
               </div>
               {game.sessionStreak > 1 && (
                 <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-500/15 border border-cyan-400/30 text-cyan-300 text-sm font-bold mb-3">
-                  <Flame className="w-4 h-4" fill="currentColor" /> Sequência: {game.sessionStreak} partidas · Próxima: {game.sessionMult.toFixed(1)}x pontos!
+                  <Flame className="w-4 h-4" fill="currentColor" /> Streak: {game.sessionStreak} games · Next: {game.sessionMult.toFixed(1)}x points!
                 </div>
               )}
               {collectionStats.discovered > 0 && (
                 <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-400/30 text-emerald-300 text-sm font-bold mb-3">
-                  <BookOpen className="w-4 h-4" /> Coleção: {collectionStats.discovered}/{collectionStats.total}
+                  <BookOpen className="w-4 h-4" /> Collection: {collectionStats.discovered}/{collectionStats.total}
                 </div>
               )}
 
               {activePowerUpCount > 0 && (
                 <div className="mb-3 flex items-center justify-center gap-2 flex-wrap">
-                  {activePowerUps.shield && <span className="text-xs px-2 py-1 rounded-full bg-blue-500/20 border border-blue-400/40 text-blue-300 font-bold">🛡️ Escudo</span>}
-                  {activePowerUps.extra_life && <span className="text-xs px-2 py-1 rounded-full bg-rose-500/20 border border-rose-400/40 text-rose-300 font-bold">❤️ Vida Extra</span>}
-                  {activePowerUps.frenzy && <span className="text-xs px-2 py-1 rounded-full bg-orange-500/20 border border-orange-400/40 text-orange-300 font-bold">⚡ Frenesi</span>}
-                  {activePowerUps.double && <span className="text-xs px-2 py-1 rounded-full bg-fuchsia-500/20 border border-fuchsia-400/40 text-fuchsia-300 font-bold">✨ Dobro</span>}
-                  {activePowerUps.freeze && <span className="text-xs px-2 py-1 rounded-full bg-sky-500/20 border border-sky-400/40 text-sky-300 font-bold">❄️ Congelamento</span>}
+                  {activePowerUps.shield && <span className="text-xs px-2 py-1 rounded-full bg-blue-500/20 border border-blue-400/40 text-blue-300 font-bold">🛡️ Shield</span>}
+                  {activePowerUps.extra_life && <span className="text-xs px-2 py-1 rounded-full bg-rose-500/20 border border-rose-400/40 text-rose-300 font-bold">❤️ Extra Life</span>}
+                  {activePowerUps.frenzy && <span className="text-xs px-2 py-1 rounded-full bg-orange-500/20 border border-orange-400/40 text-orange-300 font-bold">⚡ Frenzy</span>}
+                  {activePowerUps.double && <span className="text-xs px-2 py-1 rounded-full bg-fuchsia-500/20 border border-fuchsia-400/40 text-fuchsia-300 font-bold">✨ Double</span>}
+                  {activePowerUps.freeze && <span className="text-xs px-2 py-1 rounded-full bg-sky-500/20 border border-sky-400/40 text-sky-300 font-bold">❄️ Freeze</span>}
                 </div>
               )}
 
-              <p className="text-slate-400 text-lg mb-2">Toque nos orbes. Faça combos. Desbloqueie conquistas.</p>
-              <p className="text-slate-500 text-sm mb-6">Quantos pontos você consegue antes de perder todas as vidas?</p>
+              <p className="text-slate-400 text-lg mb-2">Tap the orbs. Build combos. Unlock achievements.</p>
+              <p className="text-slate-500 text-sm mb-6">How many points can you score before losing all your lives?</p>
 
               {/* Meta-game buttons */}
               <div className="mb-4 flex items-center justify-center gap-2 flex-wrap">
                 <button onClick={() => setModal("chest")} className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-500/15 border border-amber-400/30 text-amber-300 font-bold text-sm hover:bg-amber-500/25 transition-colors">
-                  <Gift className="w-4 h-4" /> Baú Grátis
+                  <Gift className="w-4 h-4" /> Free Chest
                 </button>
                 <button onClick={() => setModal("wheel")} disabled={!wheelAvailable} className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-cyan-500/15 border border-cyan-400/30 text-cyan-300 font-bold text-sm hover:bg-cyan-500/25 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
-                  <Target className="w-4 h-4" /> Roleta {wheelAvailable ? "" : "(usada)"}
+                  <Target className="w-4 h-4" /> Wheel {wheelAvailable ? "" : "(used)"}
                 </button>
                 <button onClick={() => setModal("quests")} className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-green-500/15 border border-green-400/30 text-green-300 font-bold text-sm hover:bg-green-500/25 transition-colors">
-                  <CheckCircle2 className="w-4 h-4" /> Missões
+                  <CheckCircle2 className="w-4 h-4" /> Quests
                 </button>
                 <button onClick={() => setModal("shop")} className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-fuchsia-500/15 border border-fuchsia-400/30 text-fuchsia-300 font-bold text-sm hover:bg-fuchsia-500/25 transition-colors">
-                  <ShoppingBag className="w-4 h-4" /> Loja
+                  <ShoppingBag className="w-4 h-4" /> Shop
                 </button>
                 <button onClick={() => setModal("collection")} className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500/15 border border-emerald-400/30 text-emerald-300 font-bold text-sm hover:bg-emerald-500/25 transition-colors">
-                  <BookOpen className="w-4 h-4" /> Coleção
+                  <BookOpen className="w-4 h-4" /> Collection
                 </button>
               </div>
 
@@ -493,14 +512,14 @@ function App() {
                 <div className="mb-6 flex items-center justify-center gap-3 px-4 py-3 rounded-xl bg-green-500/10 border border-green-400/30">
                   <Target className="w-5 h-5 text-green-400" />
                   <div className="text-left">
-                    <div className="text-green-300 font-bold text-sm">Desafio Diário</div>
-                    <div className="text-slate-400 text-xs">Alcance {game.challengeTarget.toLocaleString()} pontos hoje</div>
+                    <div className="text-green-300 font-bold text-sm">Daily Challenge</div>
+                    <div className="text-slate-400 text-xs">Reach {game.challengeTarget.toLocaleString()} points today</div>
                   </div>
                 </div>
               )}
               {game.challengeDone && (
                 <div className="mb-6 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-green-500/20 border border-green-400/40 text-green-300 font-bold text-sm">
-                  <Award className="w-4 h-4" /> Desafio de hoje completo!
+                  <Award className="w-4 h-4" /> Today's challenge complete!
                 </div>
               )}
 
@@ -509,45 +528,45 @@ function App() {
                   <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-2.5">
                     <Trophy className="w-4 h-4 text-amber-400 mx-auto mb-1" />
                     <div className="text-amber-400 font-bold text-lg">{loadedStats.high.toLocaleString()}</div>
-                    <div className="text-slate-500 text-[10px]">Recorde</div>
+                    <div className="text-slate-500 text-[10px]">Best</div>
                   </div>
                   <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-2.5">
                     <Flame className="w-4 h-4 text-orange-400 mx-auto mb-1" />
                     <div className="text-orange-400 font-bold text-lg">{game.dailyStreak}</div>
-                    <div className="text-slate-500 text-[10px]">Dias</div>
+                    <div className="text-slate-500 text-[10px]">Days</div>
                   </div>
                   <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-2.5">
                     <Target className="w-4 h-4 text-cyan-400 mx-auto mb-1" />
                     <div className="text-cyan-400 font-bold text-lg">{loadedStats.totalTaps.toLocaleString()}</div>
-                    <div className="text-slate-500 text-[10px]">Toques</div>
+                    <div className="text-slate-500 text-[10px]">Taps</div>
                   </div>
                   <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-2.5">
                     <Crown className="w-4 h-4 text-amber-300 mx-auto mb-1" />
                     <div className="text-amber-300 font-bold text-lg">{loadedStats.prestige}</div>
-                    <div className="text-slate-500 text-[10px]">Prestígio</div>
+                    <div className="text-slate-500 text-[10px]">Prestige</div>
                   </div>
                 </div>
               )}
 
               <button onClick={handleStartGame} className="group relative px-12 py-4 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold text-xl shadow-2xl shadow-cyan-500/40 hover:scale-105 active:scale-95 transition-transform">
-                <span className="flex items-center gap-3"><Play className="w-6 h-6" fill="white" />JOGAR</span>
+                <span className="flex items-center gap-3"><Play className="w-6 h-6" fill="white" />PLAY</span>
               </button>
 
               <div className="mt-6 flex flex-wrap gap-1.5 justify-center text-[11px] text-slate-500 max-w-md mx-auto">
                 <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-800/50 border border-slate-700"><span className="w-2.5 h-2.5 rounded-full bg-gradient-to-br from-cyan-400 to-blue-500" /> +10</span>
                 <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-800/50 border border-slate-700"><Star className="w-2.5 h-2.5 text-amber-400" /> +100</span>
                 <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-800/50 border border-slate-700"><Sparkles className="w-2.5 h-2.5 text-fuchsia-400" /> +50</span>
-                <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-800/50 border border-slate-700"><Zap className="w-2.5 h-2.5 text-orange-400" /> Frenesi</span>
-                <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-800/50 border border-slate-700"><HelpCircle className="w-2.5 h-2.5 text-violet-400" /> Mistério</span>
-                <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-800/50 border border-slate-700"><Shield className="w-2.5 h-2.5 text-blue-400" /> Escudo</span>
+                <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-800/50 border border-slate-700"><Zap className="w-2.5 h-2.5 text-orange-400" /> Frenzy</span>
+                <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-800/50 border border-slate-700"><HelpCircle className="w-2.5 h-2.5 text-violet-400" /> Mystery</span>
+                <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-800/50 border border-slate-700"><Shield className="w-2.5 h-2.5 text-blue-400" /> Shield</span>
                 <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-800/50 border border-slate-700"><TrendingUp className="w-2.5 h-2.5 text-green-400" /> Comeback</span>
-                <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-800/50 border border-slate-700"><Rainbow className="w-2.5 h-2.5 text-pink-400" /> Arco-Íris</span>
-                <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-800/50 border border-slate-700"><Swords className="w-2.5 h-2.5 text-red-400" /> Chefe</span>
-                <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-800/50 border border-slate-700"><Snowflake className="w-2.5 h-2.5 text-sky-400" /> Congelar</span>
-                <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-800/50 border border-slate-700"><LinkIcon className="w-2.5 h-2.5 text-yellow-400" /> Cadeia</span>
-                <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-800/50 border border-slate-700"><Ghost className="w-2.5 h-2.5 text-slate-300" /> Fantasma</span>
-                <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-800/50 border border-slate-700"><Gift className="w-2.5 h-2.5 text-amber-400" /> Tesouro</span>
-                <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-800/50 border border-slate-700"><span>💣</span> Evite!</span>
+                <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-800/50 border border-slate-700"><Rainbow className="w-2.5 h-2.5 text-pink-400" /> Rainbow</span>
+                <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-800/50 border border-slate-700"><Swords className="w-2.5 h-2.5 text-red-400" /> Boss</span>
+                <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-800/50 border border-slate-700"><Snowflake className="w-2.5 h-2.5 text-sky-400" /> Freeze</span>
+                <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-800/50 border border-slate-700"><LinkIcon className="w-2.5 h-2.5 text-yellow-400" /> Chain</span>
+                <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-800/50 border border-slate-700"><Ghost className="w-2.5 h-2.5 text-slate-300" /> Ghost</span>
+                <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-800/50 border border-slate-700"><Gift className="w-2.5 h-2.5 text-amber-400" /> Treasure</span>
+                <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-800/50 border border-slate-700"><span>💣</span> Avoid!</span>
               </div>
             </div>
           </div>
@@ -566,34 +585,34 @@ function App() {
               )}
               {game.newRecord && game.score > 0 && (
                 <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-300 font-bold text-sm mb-3" style={{ animation: "pulseGlow 1s ease-in-out infinite" }}>
-                  <Crown className="w-4 h-4" /> NOVO RECORDE!
+                  <Crown className="w-4 h-4" /> NEW RECORD!
                 </div>
               )}
               {game.prestige > 0 && (loadedStats?.prestige ?? 0) < game.prestige && (
                 <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-300 font-bold text-sm mb-3">
-                  <Crown className="w-4 h-4" /> PRESTÍGIO {game.prestige}! +10% permanente
+                  <Crown className="w-4 h-4" /> PRESTIGE {game.prestige}! +10% permanent
                 </div>
               )}
-              <h2 className="text-4xl font-black text-white mb-2">Fim de Jogo</h2>
+              <h2 className="text-4xl font-black text-white mb-2">Game Over</h2>
               <div className="text-6xl font-black text-cyan-400 mb-2" style={{ animation: "scoreBump 600ms ease-out" }}>{game.score.toLocaleString()}</div>
               {game.gems > 0 && (
                 <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-fuchsia-500/15 border border-fuchsia-400/30 text-fuchsia-300 text-sm font-bold mb-4">
-                  <Gem className="w-4 h-4" /> +{game.gems} gemas ganhas!
+                  <Gem className="w-4 h-4" /> +{game.gems} gems earned!
                 </div>
               )}
               {game.firstWinToday && (
                 <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-300 text-sm font-bold mb-3" style={{ animation: "firstWinPop 500ms ease-out" }}>
-                  <Star className="w-4 h-4" fill="currentColor" /> Primeira vitória do dia! +100 gemas!
+                  <Star className="w-4 h-4" fill="currentColor" /> First win of the day! +100 gems!
                 </div>
               )}
               {game.nearRecord && !game.newRecord && (
                 <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-orange-500/15 border border-orange-400/40 text-orange-300 text-sm font-bold mb-3" style={{ animation: "nudgeShake 0.5s ease-in-out 3" }}>
-                  <Trophy className="w-4 h-4" /> Você estava a apenas {game.recordGap.toLocaleString()} pontos do recorde!
+                  <Trophy className="w-4 h-4" /> You were only {game.recordGap.toLocaleString()} points from the record!
                 </div>
               )}
               {game.sessionStreak > 1 && (
                 <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-500/15 border border-cyan-400/30 text-cyan-300 text-sm font-bold mb-4">
-                  <Flame className="w-4 h-4" fill="currentColor" /> {game.sessionStreak} partidas seguidas · {game.sessionMult.toFixed(1)}x bônus!
+                  <Flame className="w-4 h-4" fill="currentColor" /> {game.sessionStreak} games in a row · {game.sessionMult.toFixed(1)}x bonus!
                 </div>
               )}
               <div className="grid grid-cols-3 gap-2 mb-6">
@@ -604,29 +623,29 @@ function App() {
                 </div>
                 <div className="bg-slate-800/60 border border-slate-700 rounded-xl p-3">
                   <Trophy className="w-4 h-4 text-amber-400 mx-auto mb-1" />
-                  <div className="text-amber-400 font-bold text-xl">Nv {game.level}</div>
-                  <div className="text-slate-500 text-[10px]">Nível</div>
+                  <div className="text-amber-400 font-bold text-xl">Lv {game.level}</div>
+                  <div className="text-slate-500 text-[10px]">Level</div>
                 </div>
                 <div className="bg-slate-800/60 border border-slate-700 rounded-xl p-3">
                   <Star className="w-4 h-4 text-yellow-400 mx-auto mb-1" />
                   <div className="text-yellow-400 font-bold text-xl">{game.totalGolden}</div>
-                  <div className="text-slate-500 text-[10px]">Dourados</div>
+                  <div className="text-slate-500 text-[10px]">Golden</div>
                 </div>
               </div>
 
               <button onClick={() => setModal("chest")} className="mb-3 w-full px-8 py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold text-lg shadow-2xl shadow-amber-500/40 hover:scale-105 active:scale-95 transition-transform">
-                <span className="flex items-center justify-center gap-2"><Gift className="w-5 h-5" /> ABRIR BAÚ GRÁTIS</span>
+                <span className="flex items-center justify-center gap-2"><Gift className="w-5 h-5" /> OPEN FREE CHEST</span>
               </button>
               {game.canRevive && game.score > 0 && (
                 <button onClick={game.revive} className="mb-3 w-full px-8 py-3.5 rounded-2xl bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold text-lg shadow-2xl shadow-green-500/40 hover:scale-105 active:scale-95 transition-transform">
-                  <span className="flex items-center justify-center gap-2"><Heart className="w-5 h-5" fill="currentColor" /> REVIVER (1 vida)</span>
+                  <span className="flex items-center justify-center gap-2"><Heart className="w-5 h-5" fill="currentColor" /> REVIVE (1 life)</span>
                 </button>
               )}
               <button onClick={handleStartGame} className={`group px-10 py-4 rounded-2xl text-white font-bold text-lg shadow-2xl hover:scale-105 active:scale-95 transition-transform ${lossChaseActive ? "bg-gradient-to-r from-orange-500 to-red-600 shadow-orange-500/40" : "bg-gradient-to-r from-cyan-500 to-blue-600 shadow-cyan-500/40"}`}>
-                <span className="flex items-center gap-2"><RotateCcw className="w-5 h-5" /> {lossChaseActive ? `JOGAR (${lossChase.multiplier}x BÔNUS!)` : "JOGAR DE NOVO"}</span>
+                <span className="flex items-center gap-2"><RotateCcw className="w-5 h-5" /> {lossChaseActive ? `PLAY (${lossChase.multiplier}x BONUS!)` : "PLAY AGAIN"}</span>
               </button>
               {game.autoRestartCountdown > 0 && (
-                <div className="mt-4 text-slate-400 text-sm">Recomeçando em <span className="text-cyan-400 font-bold" style={{ animation: "countdownPulse 1s ease-in-out infinite" }}>{game.autoRestartCountdown}</span>s</div>
+                <div className="mt-4 text-slate-400 text-sm">Restarting in <span className="text-cyan-400 font-bold" style={{ animation: "countdownPulse 1s ease-in-out infinite" }}>{game.autoRestartCountdown}</span>s</div>
               )}
             </div>
           </div>
@@ -639,18 +658,18 @@ function App() {
           <div className="absolute top-0 left-0 right-0 z-20 p-3 pointer-events-none">
             <div className="flex items-start justify-between gap-3">
               <div className="flex flex-col gap-0.5">
-                <div className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Pontos</div>
+                <div className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Score</div>
                 <div key={game.score} className="text-2xl font-black text-white tabular-nums leading-none" style={{ animation: "scoreBump 200ms ease-out" }}>{game.score.toLocaleString()}</div>
                 <div className="text-[10px] text-slate-500">
-                  Recorde: {Math.max(game.highScore, game.score).toLocaleString()}
+                  Best: {Math.max(game.highScore, game.score).toLocaleString()}
                   {game.prestige > 0 && <span className="text-amber-300 ml-1">· P{game.prestige}</span>}
                   {game.doublePoints && <span className="text-fuchsia-300 ml-1">· 2x</span>}
-                  {game.adrenaline && <span className="text-red-400 ml-1 font-bold">· ADRENALINA 1.5x</span>}
-                  {game.sessionMult > 1 && <span className="text-cyan-300 ml-1">· Sessão {game.sessionMult.toFixed(1)}x</span>}
+                  {game.adrenaline && <span className="text-red-400 ml-1 font-bold">· ADRENALINE 1.5x</span>}
+                  {game.sessionMult > 1 && <span className="text-cyan-300 ml-1">· Session {game.sessionMult.toFixed(1)}x</span>}
                 </div>
               </div>
               <div className="flex flex-col items-center gap-1">
-                <div className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Vidas</div>
+                <div className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Lives</div>
                 <div className="flex gap-1 items-center">
                   {Array.from({ length: Math.min(game.lives, 4) }).map((_, i) => (
                     <Heart key={i} className={`w-5 h-5 transition-all ${i < game.lives ? "text-rose-500 fill-rose-500" : "text-slate-700"}`} style={i < game.lives ? { animation: "heartBeat 1s ease-in-out infinite" } : undefined} />
@@ -659,7 +678,7 @@ function App() {
                 </div>
               </div>
               <div className="flex flex-col items-end gap-0.5">
-                <div className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Nível</div>
+                <div className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Level</div>
                 <div className="text-2xl font-black text-cyan-400 tabular-nums leading-none">{game.level}</div>
                 <div className="w-24 h-1 rounded-full bg-slate-800 overflow-hidden">
                   <div className="h-full bg-gradient-to-r from-cyan-400 to-blue-500 rounded-full transition-all duration-300" style={{ width: `${(game.score % 500) / 5}%` }} />
@@ -669,13 +688,13 @@ function App() {
             <div className="mt-2 flex items-center gap-2 flex-wrap">
               {game.progressiveJackpot > 0 && (
                 <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-400/30">
-                  <span className="text-[10px] text-amber-300 font-bold">JACKPOT PROG.</span>
+                  <span className="text-[10px] text-amber-300 font-bold">PROG. JACKPOT</span>
                   <span className="text-xs text-amber-400 font-black tabular-nums">{game.progressiveJackpot}</span>
                 </div>
               )}
               {game.luckyStreak >= 3 && (
                 <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-green-500/10 border border-green-400/30">
-                  <span className="text-[10px] text-green-300 font-bold">SORTE x{game.luckyStreak}</span>
+                  <span className="text-[10px] text-green-300 font-bold">LUCKY x{game.luckyStreak}</span>
                   <span className="text-xs text-green-400 font-black tabular-nums">{game.luckyMult.toFixed(1)}x</span>
                 </div>
               )}
@@ -696,14 +715,14 @@ function App() {
               )}
               {game.challengeDone && (
                 <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-green-500/15 border border-green-400/30">
-                  <Award className="w-3 h-3 text-green-400" /><span className="text-[10px] text-green-300 font-bold">Desafio completo!</span>
+                  <Award className="w-3 h-3 text-green-400" /><span className="text-[10px] text-green-300 font-bold">Challenge done!</span>
                 </div>
               )}
             </div>
           </div>
 
           {game.combo > 0 && (
-            <div className="absolute bottom-0 left-0 right-0 z-20 p-3 pointer-events-none flex flex-col items-center">
+            <div className="absolute z-20 p-3 pointer-events-none flex flex-col items-center" style={{ bottom: "70px", left: "50%", transform: "translateX(-50%)" }}>
               <div key={game.combo} className="flex items-center gap-2 px-5 py-1.5 rounded-full border-2" style={{
                 background: game.combo >= 25 ? "linear-gradient(90deg, rgba(251,191,36,0.2), rgba(249,115,22,0.2))" : "rgba(15,23,42,0.7)",
                 borderColor: game.combo >= 25 ? "rgba(251,191,36,0.5)" : game.combo >= 10 ? "rgba(168,85,247,0.5)" : "rgba(34,211,238,0.4)",
@@ -726,7 +745,7 @@ function App() {
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-none">
               <div className="flex items-center gap-3 px-6 py-3 rounded-2xl bg-orange-500/20 border-2 border-orange-400/50 backdrop-blur-sm" style={{ animation: "pulseGlow 0.8s ease-in-out infinite" }}>
                 <Zap className="w-6 h-6 text-orange-300" fill="currentColor" />
-                <div className="text-center"><div className="text-xl font-black text-orange-300">FRENESI</div><div className="text-xs text-orange-200">2x pontos · {game.frenzyTime}s</div></div>
+                <div className="text-center"><div className="text-xl font-black text-orange-300">FRENZY</div><div className="text-xs text-orange-200">2x points · {game.frenzyTime}s</div></div>
               </div>
             </div>
           )}
@@ -742,7 +761,7 @@ function App() {
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-none" style={{ marginTop: game.comebackActive ? "120px" : "60px" }}>
               <div className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-sky-500/20 border-2 border-sky-400/50 backdrop-blur-sm">
                 <Snowflake className="w-5 h-5 text-sky-300" />
-                <div className="text-center"><div className="text-lg font-black text-sky-300">TEMPO CONGELADO</div><div className="text-xs text-sky-200">{game.timeFreezeTime}s</div></div>
+                <div className="text-center"><div className="text-lg font-black text-sky-300">TIME FROZEN</div><div className="text-xs text-sky-200">{game.timeFreezeTime}s</div></div>
               </div>
             </div>
           )}
@@ -750,7 +769,7 @@ function App() {
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-none" style={{ marginTop: game.timeFreeze ? "180px" : game.comebackActive ? "180px" : "120px" }}>
               <div className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-amber-500/20 border-2 border-amber-400/50 backdrop-blur-sm" style={{ animation: "pulseGlow 0.5s ease-in-out infinite" }}>
                 <Star className="w-5 h-5 text-amber-300" fill="currentColor" />
-                <div className="text-center"><div className="text-lg font-black text-amber-300">HORA DA SORTE</div><div className="text-xs text-amber-200">Dourados a 35%! · {game.luckyTimeLeft}s</div></div>
+                <div className="text-center"><div className="text-lg font-black text-amber-300">LUCKY TIME</div><div className="text-xs text-amber-200">Golden at 35%! · {game.luckyTimeLeft}s</div></div>
               </div>
             </div>
           )}
@@ -758,23 +777,23 @@ function App() {
             <div className="absolute top-20 left-1/2 -translate-x-1/2 z-20 pointer-events-none">
               <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-fuchsia-500/20 border-2 border-fuchsia-400/50 backdrop-blur-sm">
                 <Sparkles className="w-4 h-4 text-fuchsia-300" />
-                <span className="text-sm font-black text-fuchsia-300">2x PONTOS · {game.doubleTimeLeft}s</span>
+                <span className="text-sm font-black text-fuchsia-300">2x POINTS · {game.doubleTimeLeft}s</span>
               </div>
             </div>
           )}
           {game.adrenaline && (
-            <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-20 pointer-events-none">
+            <div className="absolute z-20 pointer-events-none" style={{ bottom: "70px", left: "50%", transform: "translateX(-50%)" }}>
               <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-red-500/20 border-2 border-red-400/50 backdrop-blur-sm" style={{ animation: "pulseGlow 0.5s ease-in-out infinite" }}>
                 <Zap className="w-4 h-4 text-red-400" fill="currentColor" />
-                <span className="text-sm font-black text-red-300">ADRENALINA 1.5x</span>
+                <span className="text-sm font-black text-red-300">ADRENALINE 1.5x</span>
               </div>
             </div>
           )}
           {game.score > 0 && game.highScore > 0 && game.score < game.highScore && (game.highScore - game.score) <= 500 && (
-            <div className="absolute bottom-32 left-1/2 -translate-x-1/2 z-20 pointer-events-none">
+            <div className="absolute z-20 pointer-events-none" style={{ bottom: "120px", left: "50%", transform: "translateX(-50%)" }}>
               <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/15 border border-amber-400/40" style={{ animation: "nudgeShake 0.5s ease-in-out 3" }}>
                 <Trophy className="w-3.5 h-3.5 text-amber-400" />
-                <span className="text-xs font-bold text-amber-300">Faltam {(game.highScore - game.score).toLocaleString()} pts pro recorde!</span>
+                <span className="text-xs font-bold text-amber-300">Only {(game.highScore - game.score).toLocaleString()} pts from the record!</span>
               </div>
             </div>
           )}
@@ -783,7 +802,7 @@ function App() {
 
       {/* Social proof notifications */}
       {socialNotifs.length > 0 && (
-        <div className="absolute bottom-4 left-4 z-40 flex flex-col gap-2 pointer-events-none">
+        <div className="absolute z-40 flex flex-col gap-2 pointer-events-none" style={{ bottom: "70px", left: "16px" }}>
           {socialNotifs.map((n) => (
             <div key={n.id} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-800/90 border border-slate-600/50 shadow-lg backdrop-blur-sm" style={{ animation: "slideInLeft 5s ease-in-out forwards" }}>
               <span className="text-lg">{n.icon}</span>
@@ -794,7 +813,7 @@ function App() {
       )}
 
       {/* Mute button */}
-      <button onClick={toggleMute} className="absolute top-3 right-3 z-50 w-9 h-9 rounded-full bg-slate-800/80 border border-slate-700 flex items-center justify-center text-slate-300 hover:text-white hover:bg-slate-700 transition-colors">
+      <button onClick={toggleMute} className="absolute top-3 left-3 z-50 w-9 h-9 rounded-full bg-slate-800/80 border border-slate-700 flex items-center justify-center text-slate-300 hover:text-white hover:bg-slate-700 transition-colors">
         {muted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
       </button>
 
@@ -813,7 +832,7 @@ function App() {
         <div className="absolute top-1/4 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
           <div className="flex flex-col items-center gap-2 px-6 py-4 rounded-2xl bg-emerald-500/20 border-2 border-emerald-400/50 backdrop-blur-md" style={{ animation: "collectionPop 500ms ease-out, slideDownFade 3s ease-in-out forwards" }}>
             <span className="text-4xl">{collectionPopup.icon}</span>
-            <div className="text-lg font-black text-emerald-300">NOVO ORB!</div>
+            <div className="text-lg font-black text-emerald-300">NEW ORB!</div>
             <div className="text-sm text-emerald-200">{collectionPopup.label}</div>
           </div>
         </div>
@@ -824,8 +843,8 @@ function App() {
         <div className="absolute top-1/3 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
           <div className="flex flex-col items-center gap-2 px-8 py-6 rounded-2xl bg-orange-500/20 border-2 border-orange-400/50 backdrop-blur-md" style={{ animation: "slideDownFade 4s ease-in-out forwards" }}>
             <Flame className="w-10 h-10 text-orange-400" fill="currentColor" />
-            <div className="text-2xl font-black text-orange-300">{streakInfo.streak} dias seguidos!</div>
-            <div className="text-sm text-orange-200">Volte amanhã para manter o fogo aceso</div>
+            <div className="text-2xl font-black text-orange-300">{streakInfo.streak} days in a row!</div>
+            <div className="text-sm text-orange-200">Come back tomorrow to keep the fire going</div>
           </div>
         </div>
       )}
@@ -835,8 +854,8 @@ function App() {
         <div className="absolute top-1/3 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
           <div className="flex flex-col items-center gap-2 px-8 py-6 rounded-2xl bg-green-500/20 border-2 border-green-400/50 backdrop-blur-md" style={{ animation: "slideDownFade 4.5s ease-in-out forwards" }}>
             <Target className="w-10 h-10 text-green-400" />
-            <div className="text-xl font-black text-green-300">Desafio de hoje!</div>
-            <div className="text-sm text-green-200">Alcance {challengeInfo.target.toLocaleString()} pontos</div>
+            <div className="text-xl font-black text-green-300">Today's Challenge!</div>
+            <div className="text-sm text-green-200">Reach {challengeInfo.target.toLocaleString()} points</div>
           </div>
         </div>
       )}
@@ -852,8 +871,8 @@ function App() {
             {/* CHEST MODAL with near-miss tease */}
             {modal === "chest" && (
               <div className="bg-slate-900 border border-slate-700 rounded-3xl p-8 text-center">
-                <h3 className="text-2xl font-black text-white mb-1">Baú Grátis</h3>
-                <p className="text-slate-400 text-sm mb-6">Abra e ganhe gemas! Raridades melhores dão mais.</p>
+                <h3 className="text-2xl font-black text-white mb-1">Free Chest</h3>
+                <p className="text-slate-400 text-sm mb-6">Open it and win gems! Better rarities give more.</p>
 
                 {!chestOpening && !chestReward && (
                   <button onClick={handleOpenChest} className="mx-auto block">
@@ -882,7 +901,7 @@ function App() {
                     </div>
                     {chestTeaseIndex >= 0 && chestTeaseIndex < chestTeaseRarities.length && (
                       <div className="mt-2 text-sm font-bold" style={{ color: ["#94a3b8", "#3b82f6", "#d946ef", "#f59e0b", "#f43f5e"][RARITY_ORDER.indexOf(chestTeaseRarities[chestTeaseIndex])] }}>
-                        {["Comum", "Raro", "Épico", "Lendário", "MÍTICO"][RARITY_ORDER.indexOf(chestTeaseRarities[chestTeaseIndex])]}
+                        {["Common", "Rare", "Epic", "Legendary", "MYTHIC"][RARITY_ORDER.indexOf(chestTeaseRarities[chestTeaseIndex])]}
                       </div>
                     )}
                   </div>
@@ -894,10 +913,10 @@ function App() {
                       <Gem className="w-16 h-16 text-white" />
                     </div>
                     <div className="mt-4 text-3xl font-black text-white">{chestReward.label}!</div>
-                    <div className="mt-1 text-4xl font-black text-amber-400">+{chestReward.gems} gemas</div>
-                    {chestReward.rarity === "mythic" && <div className="mt-2 text-rose-400 font-black text-sm" style={{ animation: "countdownPulse 0.5s ease-in-out infinite" }}>MÍTICO! INCRÍVEL!</div>}
-                    {chestReward.rarity === "legendary" && <div className="mt-2 text-amber-400 font-black text-sm">LENDÁRIO!</div>}
-                    <button onClick={() => setChestReward(null)} className="mt-6 px-8 py-3 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold hover:scale-105 active:scale-95 transition-transform">Continuar</button>
+                    <div className="mt-1 text-4xl font-black text-amber-400">+{chestReward.gems} gems</div>
+                    {chestReward.rarity === "mythic" && <div className="mt-2 text-rose-400 font-black text-sm" style={{ animation: "countdownPulse 0.5s ease-in-out infinite" }}>MYTHIC! INCREDIBLE!</div>}
+                    {chestReward.rarity === "legendary" && <div className="mt-2 text-amber-400 font-black text-sm">LEGENDARY!</div>}
+                    <button onClick={() => setChestReward(null)} className="mt-6 px-8 py-3 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold hover:scale-105 active:scale-95 transition-transform">Continue</button>
                   </div>
                 )}
               </div>
@@ -906,8 +925,8 @@ function App() {
             {/* WHEEL MODAL */}
             {modal === "wheel" && (
               <div className="bg-slate-900 border border-slate-700 rounded-3xl p-8 text-center">
-                <h3 className="text-2xl font-black text-white mb-1">Roleta Diária</h3>
-                <p className="text-slate-400 text-sm mb-6">{wheelAvailable ? "Gire e ganhe gemas!" : "Você já girou hoje. Volte amanhã!"}</p>
+                <h3 className="text-2xl font-black text-white mb-1">Daily Wheel</h3>
+                <p className="text-slate-400 text-sm mb-6">{wheelAvailable ? "Spin and win gems!" : "You already spun today. Come back tomorrow!"}</p>
                 <div className="relative w-56 h-56 mx-auto mb-6">
                   <div className="absolute top-0 left-1/2 -translate-x-1/2 z-10 w-0 h-0 border-l-[10px] border-r-[10px] border-t-[16px] border-l-transparent border-r-transparent border-t-amber-400" />
                   <div className="absolute inset-0 rounded-full border-4 border-slate-600 overflow-hidden" style={{ transform: `rotate(${wheelAngle}deg)`, transition: wheelSpinning ? "transform 4s cubic-bezier(0.17, 0.67, 0.12, 0.99)" : "none" }}>
@@ -926,10 +945,10 @@ function App() {
                   </div>
                 </div>
                 {wheelResult !== null && !wheelSpinning && (
-                  <div className="mb-4 text-2xl font-black text-amber-400" style={{ animation: "scoreBump 500ms ease-out" }}>+{WHEEL_SEGMENTS[wheelResult].gems} gemas!</div>
+                  <div className="mb-4 text-2xl font-black text-amber-400" style={{ animation: "scoreBump 500ms ease-out" }}>+{WHEEL_SEGMENTS[wheelResult].gems} gems!</div>
                 )}
                 <button onClick={handleSpinWheel} disabled={!wheelAvailable || wheelSpinning} className="px-8 py-3 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold hover:scale-105 active:scale-95 transition-transform disabled:opacity-40 disabled:cursor-not-allowed">
-                  {wheelSpinning ? "Girando..." : wheelAvailable ? "GIRAR" : "Volte amanhã"}
+                  {wheelSpinning ? "Spinning..." : wheelAvailable ? "SPIN" : "Come back tomorrow"}
                 </button>
               </div>
             )}
@@ -938,10 +957,10 @@ function App() {
             {modal === "shop" && (
               <div className="bg-slate-900 border border-slate-700 rounded-3xl p-8">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-2xl font-black text-white">Loja de Power-ups</h3>
+                  <h3 className="text-2xl font-black text-white">Power-up Shop</h3>
                   <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-fuchsia-500/15 border border-fuchsia-400/30 text-fuchsia-300 font-bold text-sm"><Gem className="w-4 h-4" /> {gems}</div>
                 </div>
-                <p className="text-slate-400 text-sm mb-4">Compre power-ups para a próxima partida. Eles ativam automaticamente.</p>
+                <p className="text-slate-400 text-sm mb-4">Buy power-ups for your next game. They activate automatically.</p>
                 {buyError && <div className="mb-3 text-rose-400 text-sm font-bold text-center">{buyError}</div>}
                 <div className="space-y-2">
                   {POWER_UPS.map((p) => {
@@ -950,7 +969,7 @@ function App() {
                       <div key={p.key} className={`flex items-center gap-3 p-3 rounded-xl border ${owned ? "bg-green-500/10 border-green-400/30" : "bg-slate-800/60 border-slate-700"}`}>
                         <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${p.color} flex items-center justify-center text-lg flex-shrink-0`}>{p.icon}</div>
                         <div className="flex-1 min-w-0"><div className="text-white font-bold text-sm">{p.name}</div><div className="text-slate-400 text-xs">{p.desc}</div></div>
-                        {owned ? <div className="flex items-center gap-1 text-green-400 font-bold text-xs"><CheckCircle2 className="w-4 h-4" /> Ativo</div>
+                        {owned ? <div className="flex items-center gap-1 text-green-400 font-bold text-xs"><CheckCircle2 className="w-4 h-4" /> Active</div>
                           : <button onClick={() => handleBuy(p.key, p.cost)} disabled={gems < p.cost} className={`flex items-center gap-1 px-3 py-1.5 rounded-lg font-bold text-xs ${gems >= p.cost ? "bg-fuchsia-500/20 border border-fuchsia-400/40 text-fuchsia-300 hover:bg-fuchsia-500/30" : "bg-slate-700/50 border border-slate-600 text-slate-500 cursor-not-allowed"} transition-colors`}><Gem className="w-3 h-3" /> {p.cost}</button>}
                       </div>
                     );
@@ -963,12 +982,12 @@ function App() {
             {modal === "quests" && (
               <div className="bg-slate-900 border border-slate-700 rounded-3xl p-8">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-2xl font-black text-white">Missões Diárias</h3>
+                  <h3 className="text-2xl font-black text-white">Daily Quests</h3>
                   <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-fuchsia-500/15 border border-fuchsia-400/30 text-fuchsia-300 font-bold text-sm"><Gem className="w-4 h-4" /> {gems}</div>
                 </div>
-                <p className="text-slate-400 text-sm mb-4">Complete 3 missões e ganhe 50 gemas cada!</p>
+                <p className="text-slate-400 text-sm mb-4">Complete 3 quests and earn 50 gems each!</p>
                 <div className="space-y-2 mb-4">
-                  {quests.length === 0 && <div className="text-slate-500 text-sm text-center py-4">Carregando missões...</div>}
+                  {quests.length === 0 && <div className="text-slate-500 text-sm text-center py-4">Loading quests...</div>}
                   {quests.map((q, i) => (
                     <div key={i} className={`flex items-center gap-3 p-3 rounded-xl border ${q.claimed ? "bg-slate-800/30 border-slate-700" : q.done ? "bg-green-500/10 border-green-400/30" : "bg-slate-800/60 border-slate-700"}`}>
                       <span className="text-xl flex-shrink-0">{questIcon(q.type)}</span>
@@ -977,14 +996,14 @@ function App() {
                         <div className="w-full h-1.5 rounded-full bg-slate-700 overflow-hidden mt-1"><div className="h-full bg-gradient-to-r from-green-400 to-emerald-500 rounded-full transition-all" style={{ width: `${Math.min(100, (q.progress / q.target) * 100)}%` }} /></div>
                         <div className="text-slate-400 text-xs mt-0.5">{q.progress} / {q.target}</div>
                       </div>
-                      {q.claimed ? <span className="text-slate-500 text-xs font-bold">Resgatado</span>
+                      {q.claimed ? <span className="text-slate-500 text-xs font-bold">Claimed</span>
                         : q.done ? <span className="flex items-center gap-1 text-green-400 text-xs font-bold"><CheckCircle2 className="w-4 h-4" /> +50</span>
                         : <Circle className="w-5 h-5 text-slate-600 flex-shrink-0" />}
                     </div>
                   ))}
                 </div>
                 {quests.some((q) => q.done && !q.claimed) && (
-                  <button onClick={handleClaimQuests} className="w-full px-6 py-3 rounded-2xl bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold hover:scale-105 active:scale-95 transition-transform">Resgatar Recompensas</button>
+                  <button onClick={handleClaimQuests} className="w-full px-6 py-3 rounded-2xl bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold hover:scale-105 active:scale-95 transition-transform">Claim Rewards</button>
                 )}
               </div>
             )}
@@ -993,12 +1012,12 @@ function App() {
             {modal === "collection" && (
               <div className="bg-slate-900 border border-slate-700 rounded-3xl p-8">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-2xl font-black text-white">Coleção de Orbes</h3>
+                  <h3 className="text-2xl font-black text-white">Orb Collection</h3>
                   <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-400/30 text-emerald-300 font-bold text-sm">
                     <BookOpen className="w-4 h-4" /> {collectionStats.discovered}/{collectionStats.total}
                   </div>
                 </div>
-                <p className="text-slate-400 text-sm mb-4">Descubra todos os tipos de orb! Cada um tem efeitos diferentes.</p>
+                <p className="text-slate-400 text-sm mb-4">Discover all orb types! Each one has different effects.</p>
                 <div className="grid grid-cols-3 gap-3">
                   {collectionEntries.map((entry) => (
                     <div key={entry.type} className={`flex flex-col items-center gap-1 p-3 rounded-xl border ${entry.discovered ? "bg-slate-800/60 border-slate-600" : "bg-slate-800/20 border-slate-700/50"}`}>
@@ -1010,7 +1029,7 @@ function App() {
                 </div>
                 {collectionStats.discovered === collectionStats.total && (
                   <div className="mt-4 text-center text-amber-400 font-black text-sm" style={{ animation: "pulseGlow 1s ease-in-out infinite" }}>
-                    🏅 PARABÉNS! Coleção completa!
+                    🏅 CONGRATULATIONS! Collection complete!
                   </div>
                 )}
               </div>
@@ -1018,6 +1037,9 @@ function App() {
           </div>
         </div>
       )}
+
+      {/* PAYWALL MODAL */}
+      <PaywallModal open={showPaywall} onClose={() => setShowPaywall(false)} onActivated={handlePaywallActivated} />
     </div>
   );
 }
