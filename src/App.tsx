@@ -13,7 +13,7 @@ import { setMuted, isMuted, playChestTease, playChestReveal, playSocialNotificat
 import {
   loadStats, saveStats, updateDailyStreak, rollDailyChallenge, updateChallengeProgress,
   rollDailyQuests, updateQuestProgress, claimQuestRewards, canSpinWheel, spinWheelSave,
-  buyPowerUp, clearPowerUps,
+  buyPowerUp, clearPowerUps, addGems,
 } from "@/lib/supabase";
 import { rollChest, rollChestWithTease, rarityIndex, type ChestReward, type ChestRarity, RARITY_ORDER } from "@/lib/chest";
 import { parseQuests, questLabel, questIcon, type QuestState } from "@/lib/quests";
@@ -24,6 +24,10 @@ import { rollSocialNotification, randomSocialDelay, type SocialNotification } fr
 import { getLossChaseBonus, type LossChaseBonus } from "@/lib/lossChase";
 import { isPremium, incrementPlayCount, hasPaywallBeenShown, setPaywallShown, resetPaywallState, setLockout24h, isLockedOut, clearLockout, resetPlayCount, checkUrlActivation } from "@/lib/premium";
 import { PaywallModal } from "@/components/PaywallModal";
+import { generateLeaderboard, type LeaderboardEntry } from "@/lib/leaderboard";
+import { getRivalSeed, setRivalSeed, getRivalBeatenCount, incrementRivalBeaten } from "@/lib/rivalState";
+import { LeaderboardModal } from "@/components/LeaderboardModal";
+import { DoubleOrNothingModal } from "@/components/DoubleOrNothingModal";
 
 const ORB_COLORS: Record<string, { bg: string; border: string; glow: string }> = {
   normal: { bg: "from-cyan-400 to-blue-500", border: "border-cyan-300", glow: "shadow-cyan-400/50" },
@@ -42,7 +46,7 @@ const ORB_COLORS: Record<string, { bg: string; border: string; glow: string }> =
   treasure: { bg: "from-amber-400 to-orange-500", border: "border-amber-300", glow: "shadow-amber-400/70" },
 };
 
-type ModalType = "chest" | "wheel" | "shop" | "quests" | "collection" | null;
+type ModalType = "chest" | "wheel" | "shop" | "quests" | "collection" | "leaderboard" | null;
 
 function App() {
   const { canvasRef, burst, floatText, shockwave } = useParticleCanvas();
@@ -81,6 +85,13 @@ function App() {
   const [showPaywall, setShowPaywall] = useState(false);
   const [lockoutActive, setLockoutActive] = useState(false);
   const [premium, setPremiumState] = useState(isPremium());
+  const [leaderboardEntries, setLeaderboardEntries] = useState<LeaderboardEntry[]>([]);
+  const [rivalBeatenCount, setRivalBeatenCount] = useState(0);
+  const [rivalSeed, setRivalSeedState] = useState(0);
+  const [showRivalBeatenPopup, setShowRivalBeatenPopup] = useState(false);
+  const [showDoubleOrNothing, setShowDoubleOrNothing] = useState(false);
+  const [doubleOrNothingGems, setDoubleOrNothingGems] = useState(0);
+  const [lastSavedGameGems, setLastSavedGameGems] = useState(0);
   const shakeTimerRef = useRef<number | null>(null);
   const flashTimerRef = useRef<number | null>(null);
 
@@ -183,6 +194,7 @@ function App() {
         daily_challenge_progress: Math.max(game.score, loadedStats?.high ?? 0),
         gems: (loadedStats?.gems ?? 0) + gemsEarned,
       });
+      setLastSavedGameGems(gemsEarned);
       setGems((g) => g + gemsEarned);
       setLoadedStats((prev) => prev ? {
         ...prev, high: newHigh, bestCombo: newBestCombo,
@@ -193,10 +205,38 @@ function App() {
         gems: (prev.gems ?? 0) + gemsEarned,
       } : prev);
       if (game.score > (loadedStats?.high ?? 0)) game.setHighScore(game.score);
+
+      // Check if player beat their rival
+      if (game.score > 0 && game.highScore > 0) {
+        const board = generateLeaderboard(game.highScore, rivalSeed);
+        const rival = board.find((e) => e.isRival);
+        if (rival && game.score > rival.score) {
+          const newCount = incrementRivalBeaten();
+          setRivalBeatenCount(newCount);
+          const newSeed = Math.floor(Math.random() * 1000000) + 1;
+          setRivalSeed(newSeed);
+          setRivalSeedState(newSeed);
+          setShowRivalBeatenPopup(true);
+          setTimeout(() => setShowRivalBeatenPopup(false), 4000);
+        }
+      }
+
+      // Update leaderboard with new high score
+      const finalHigh = Math.max(game.highScore, game.score);
+      setLeaderboardEntries(generateLeaderboard(finalHigh, rivalSeed));
+
       clearPowerUps();
       setActivePowerUps({ shield: false, extra_life: false, frenzy: false, double: false, freeze: false });
       setPowerUps({ shield: false, extra_life: false, frenzy: false, double: false, freeze: false });
       refreshQuests();
+
+      // Offer double or nothing if gems were earned
+      if (gemsEarned > 0) {
+        setTimeout(() => {
+          setDoubleOrNothingGems(gemsEarned);
+          setShowDoubleOrNothing(true);
+        }, 800);
+      }
 
       // Paywall logic: show after 3 games for non-premium users
       if (!premium) {
@@ -242,6 +282,11 @@ function App() {
       setShowPaywall(true);
     }
 
+    // Load rival seed
+    const seed = getRivalSeed();
+    setRivalSeedState(seed);
+    setRivalBeatenCount(getRivalBeatenCount());
+
     (async () => {
       const stats = await loadStats();
       if (stats) {
@@ -263,6 +308,11 @@ function App() {
           frenzy: stats.power_frenzy, double: stats.power_double, freeze: stats.power_freeze,
         });
         setQuests(parseQuests(stats));
+        // Generate initial leaderboard based on loaded high score
+        setLeaderboardEntries(generateLeaderboard(stats.high_score, seed));
+      } else {
+        // New player — generate leaderboard with 0 high score
+        setLeaderboardEntries(generateLeaderboard(0, seed));
       }
       const streakResult = await updateDailyStreak();
       if (streakResult) {
@@ -301,6 +351,7 @@ function App() {
       return;
     }
     setLossChase({ active: false, multiplier: 1, secondsLeft: 0, reason: "" });
+    setShowDoubleOrNothing(false);
     game.startGame(activePowerUps);
   };
 
@@ -370,6 +421,18 @@ function App() {
     clearLockout();
     resetPlayCount();
     resetPaywallState();
+  };
+
+  const handleDoubleOrNothingCollect = (finalGems: number) => {
+    // Adjust saved gems: we already saved the original earned gems in the game over effect.
+    // The difference between finalGems and lastSavedGameGems needs to be persisted.
+    const diff = finalGems - lastSavedGameGems;
+    if (diff !== 0) {
+      addGems(diff);
+      setGems((g) => g + diff);
+      setLoadedStats((prev) => prev ? { ...prev, gems: (prev.gems ?? 0) + diff } : prev);
+    }
+    setShowDoubleOrNothing(false);
   };
 
   const shakeStyle = shake > 0 ? { animation: `shake 300ms ease-out` } : undefined;
@@ -531,6 +594,9 @@ function App() {
                 <button onClick={() => setModal("collection")} className="flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl bg-emerald-500/15 border border-emerald-400/30 text-emerald-300 font-bold text-xs sm:text-sm hover:bg-emerald-500/25 transition-colors">
                   <BookOpen className="w-4 h-4" /> Collection
                 </button>
+                <button onClick={() => setModal("leaderboard")} className="flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl bg-amber-500/15 border border-amber-400/30 text-amber-300 font-bold text-xs sm:text-sm hover:bg-amber-500/25 transition-colors">
+                  <Trophy className="w-4 h-4" /> Ranks
+                </button>
               </div>
 
               {game.challengeTarget > 0 && !game.challengeDone && (
@@ -668,6 +734,9 @@ function App() {
               )}
               <button onClick={handleStartGame} className={`group w-full px-10 py-4 rounded-2xl text-white font-bold text-base sm:text-lg shadow-2xl hover:scale-105 active:scale-95 transition-transform ${lossChaseActive ? "bg-gradient-to-r from-orange-500 to-red-600 shadow-orange-500/40" : "bg-gradient-to-r from-cyan-500 to-blue-600 shadow-cyan-500/40"}`}>
                 <span className="flex items-center justify-center gap-2"><RotateCcw className="w-5 h-5" /> {lossChaseActive ? `PLAY (${lossChase.multiplier}x BONUS!)` : "PLAY AGAIN"}</span>
+              </button>
+              <button onClick={() => setModal("leaderboard")} className="mt-3 w-full px-8 py-3 rounded-2xl bg-slate-800/60 border border-slate-700 text-slate-300 font-bold text-sm hover:scale-105 active:scale-95 transition-transform">
+                <span className="flex items-center justify-center gap-2"><Trophy className="w-5 h-5 text-amber-400" /> VIEW RANKINGS</span>
               </button>
               {game.autoRestartCountdown > 0 && (
                 <div className="mt-4 text-slate-400 text-sm">Restarting in <span className="text-cyan-400 font-bold" style={{ animation: "countdownPulse 1s ease-in-out infinite" }}>{game.autoRestartCountdown}</span>s</div>
@@ -849,6 +918,17 @@ function App() {
           </div>
         ))}
       </div>
+
+      {/* Rival beaten popup */}
+      {showRivalBeatenPopup && (
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 z-50 pointer-events-none px-4">
+          <div className="flex flex-col items-center gap-2 px-8 py-6 rounded-2xl bg-orange-500/20 border-2 border-orange-400/50 backdrop-blur-md" style={{ animation: "slideDownFade 4s ease-in-out forwards" }}>
+            <Swords className="w-10 h-10 text-orange-400" />
+            <div className="text-xl sm:text-2xl font-black text-orange-300">RIVAL BEATEN!</div>
+            <div className="text-xs sm:text-sm text-orange-200">A new challenger has appeared...</div>
+          </div>
+        </div>
+      )}
 
       {/* Collection discovery popup */}
       {collectionPopup && (
@@ -1057,8 +1137,24 @@ function App() {
                 )}
               </div>
             )}
+
+            {/* LEADERBOARD MODAL */}
+            {modal === "leaderboard" && (
+              <LeaderboardModal entries={leaderboardEntries} rivalBeatenCount={rivalBeatenCount} onClose={closeModal} />
+            )}
           </div>
         </div>
+      )}
+
+      {/* DOUBLE OR NOTHING MODAL */}
+      {showDoubleOrNothing && (
+        <DoubleOrNothingModal
+          initialGems={doubleOrNothingGems}
+          onCollect={handleDoubleOrNothingCollect}
+          onClose={() => {
+            handleDoubleOrNothingCollect(lastSavedGameGems);
+          }}
+        />
       )}
 
       {/* PAYWALL MODAL */}
