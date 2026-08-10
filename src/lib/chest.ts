@@ -9,11 +9,11 @@ export interface ChestReward {
 }
 
 const RARITY_CONFIG: Record<ChestRarity, { weight: number; gems: [number, number]; color: string; glow: string; label: string }> = {
-  common: { weight: 50, gems: [5, 15], color: "from-slate-400 to-slate-600", glow: "shadow-slate-400/40", label: "Comum" },
-  rare: { weight: 28, gems: [20, 40], color: "from-blue-400 to-blue-600", glow: "shadow-blue-400/50", label: "Raro" },
-  epic: { weight: 14, gems: [50, 100], color: "from-fuchsia-400 to-purple-600", glow: "shadow-fuchsia-400/60", label: "Épico" },
-  legendary: { weight: 6, gems: [150, 300], color: "from-amber-300 to-yellow-500", glow: "shadow-amber-400/70", label: "Lendário" },
-  mythic: { weight: 2, gems: [500, 1000], color: "from-rose-400 via-amber-300 to-cyan-400", glow: "shadow-rose-400/80", label: "MÍTICO" },
+  common: { weight: 50, gems: [5, 15], color: "from-slate-400 to-slate-600", glow: "shadow-slate-400/40", label: "Common" },
+  rare: { weight: 28, gems: [20, 40], color: "from-blue-400 to-blue-600", glow: "shadow-blue-400/50", label: "Rare" },
+  epic: { weight: 14, gems: [50, 100], color: "from-fuchsia-400 to-purple-600", glow: "shadow-fuchsia-400/60", label: "Epic" },
+  legendary: { weight: 6, gems: [150, 300], color: "from-amber-300 to-yellow-500", glow: "shadow-amber-400/70", label: "Legendary" },
+  mythic: { weight: 2, gems: [500, 1000], color: "from-rose-400 via-amber-300 to-cyan-400", glow: "shadow-rose-400/80", label: "MYTHIC" },
 };
 
 export const RARITY_ORDER: ChestRarity[] = ["common", "rare", "epic", "legendary", "mythic"];
