@@ -54,6 +54,15 @@ export interface PlayerStats {
   power_frenzy: boolean;
   power_double: boolean;
   power_freeze: boolean;
+  login_reward_day: number;
+  login_reward_date: string | null;
+  login_reward_claimed_today: boolean;
+  squeeze_state: string;
+  squeeze_games_threshold: number;
+  squeeze_games_counter: number;
+  invite_count: number;
+  invited_by: string | null;
+  invite_reward_claimed: boolean;
 }
 
 const DEFAULT_STATS: Omit<PlayerStats, "id" | "device_id"> = {
@@ -100,6 +109,15 @@ const DEFAULT_STATS: Omit<PlayerStats, "id" | "device_id"> = {
   power_frenzy: false,
   power_double: false,
   power_freeze: false,
+  login_reward_day: 0,
+  login_reward_date: null,
+  login_reward_claimed_today: false,
+  squeeze_state: "dry",
+  squeeze_games_threshold: 3,
+  squeeze_games_counter: 0,
+  invite_count: 0,
+  invited_by: null,
+  invite_reward_claimed: false,
 };
 
 export async function loadStats(): Promise<PlayerStats | null> {
@@ -353,4 +371,124 @@ export async function addGems(amount: number): Promise<void> {
   const stats = await loadStats();
   if (!stats) return;
   await saveStats({ gems: (stats.gems ?? 0) + amount });
+}
+
+// ===== LOGIN REWARD SYSTEM =====
+
+export async function checkLoginReward(): Promise<{
+  available: boolean;
+  day: number;
+  gems: number;
+  bonus?: string;
+  isLegendary?: boolean;
+  streakBroken: boolean;
+} | null> {
+  const today = new Date().toISOString().slice(0, 10);
+  const stats = await loadStats();
+  if (!stats) return null;
+
+  if (stats.login_reward_date === today && stats.login_reward_claimed_today) {
+    return { available: false, day: stats.login_reward_day, gems: 0, streakBroken: false };
+  }
+
+  let day = stats.login_reward_day ?? 0;
+  let streakBroken = false;
+
+  if (stats.login_reward_date) {
+    const last = new Date(stats.login_reward_date + "T00:00:00");
+    const diffDays = Math.floor((Date.now() - last.getTime()) / (1000 * 60 * 60 * 24));
+    if (diffDays === 1) {
+      day += 1;
+    } else if (diffDays > 1) {
+      day = 1;
+      streakBroken = true;
+    } else if (diffDays === 0) {
+      // Same day but not claimed yet — shouldn't happen, but handle it
+      day = day > 0 ? day : 1;
+    }
+  } else {
+    day = 1;
+  }
+
+  const { getLoginReward } = await import("./loginRewards");
+  const reward = getLoginReward(day);
+
+  return {
+    available: true,
+    day,
+    gems: reward.gems,
+    bonus: reward.bonus,
+    isLegendary: reward.isLegendary,
+    streakBroken,
+  };
+}
+
+export async function claimLoginReward(): Promise<{ gems: number; day: number; bonus?: string; isLegendary?: boolean } | null> {
+  const today = new Date().toISOString().slice(0, 10);
+  const check = await checkLoginReward();
+  if (!check || !check.available) return null;
+
+  const stats = await loadStats();
+  if (!stats) return null;
+
+  await saveStats({
+    login_reward_day: check.day,
+    login_reward_date: today,
+    login_reward_claimed_today: true,
+    gems: (stats.gems ?? 0) + check.gems,
+  });
+
+  return { gems: check.gems, day: check.day, bonus: check.bonus, isLegendary: check.isLegendary };
+}
+
+// ===== SQUEEZE SYSTEM =====
+
+export async function getSqueezeData(): Promise<{ state: string; counter: number; threshold: number }> {
+  const stats = await loadStats();
+  if (!stats) return { state: "dry", counter: 0, threshold: 3 };
+  return {
+    state: stats.squeeze_state ?? "dry",
+    counter: stats.squeeze_games_counter ?? 0,
+    threshold: stats.squeeze_games_threshold ?? 3,
+  };
+}
+
+export async function recordGamePlayedSqueeze(): Promise<{ newState: string; isReady: boolean }> {
+  const stats = await loadStats();
+  if (!stats) return { newState: "dry", isReady: false };
+
+  let counter = (stats.squeeze_games_counter ?? 0) + 1;
+  let state = stats.squeeze_state ?? "dry";
+  const threshold = stats.squeeze_games_threshold ?? 3;
+
+  if (state === "dry" && counter >= threshold) {
+    state = "ready";
+    await saveStats({ squeeze_state: state, squeeze_games_counter: counter });
+    return { newState: state, isReady: true };
+  }
+
+  await saveStats({ squeeze_games_counter: counter });
+  return { newState: state, isReady: false };
+}
+
+export async function consumeSqueezeReward(): Promise<void> {
+  const { getInitialThreshold } = await import("./squeeze");
+  const newThreshold = getInitialThreshold();
+  await saveStats({
+    squeeze_state: "dry",
+    squeeze_games_counter: 0,
+    squeeze_games_threshold: newThreshold,
+  });
+}
+
+export async function getSqueezeMultiplier(): Promise<number> {
+  const stats = await loadStats();
+  if (!stats) return 1;
+  const state = stats.squeeze_state ?? "dry";
+  if (state === "ready") {
+    const { getReadyMultiplier } = await import("./squeeze");
+    return getReadyMultiplier();
+  }
+  const { getDryMultiplier } = await import("./squeeze");
+  return getDryMultiplier();
 }
