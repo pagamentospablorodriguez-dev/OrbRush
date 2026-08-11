@@ -5,7 +5,7 @@ import {
   Play, RotateCcw, Volume2, VolumeX, Flame, Star, Heart, Zap, Trophy, Target,
   Sparkles, Crown, Shield, HelpCircle, TrendingUp, Award, Link as LinkIcon,
   Ghost, Gift, Snowflake, Swords, Rainbow, Gem, CheckCircle2, Circle, X,
-  ShoppingBag, BookOpen, AlertTriangle, Timer,
+  ShoppingBag, BookOpen, AlertTriangle, Timer, Home, Users, Calendar,
 } from "lucide-react";
 import { useParticleCanvas } from "@/lib/particles";
 import { useGame, type Orb, type Achievement, type PowerUps } from "@/lib/useGame";
@@ -14,6 +14,7 @@ import {
   loadStats, saveStats, updateDailyStreak, rollDailyChallenge, updateChallengeProgress,
   rollDailyQuests, updateQuestProgress, claimQuestRewards, canSpinWheel, spinWheelSave,
   buyPowerUp, clearPowerUps, addGems,
+  checkLoginReward, claimLoginReward, getSqueezeData, recordGamePlayedSqueeze, consumeSqueezeReward, getSqueezeMultiplier,
 } from "@/lib/supabase";
 import { rollChest, rollChestWithTease, rarityIndex, type ChestReward, type ChestRarity, RARITY_ORDER } from "@/lib/chest";
 import { parseQuests, questLabel, questIcon, type QuestState } from "@/lib/quests";
@@ -26,10 +27,13 @@ import { isPremium, checkUrlActivation } from "@/lib/premium";
 import { getLives, consumeLife, getSecondsToNextLife, MAX_LIVES } from "@/lib/lives";
 import { PaywallModal } from "@/components/PaywallModal";
 import { ContinueOfferModal } from "@/components/ContinueOfferModal";
+import { LoginRewardModal } from "@/components/LoginRewardModal";
+import { InviteModal } from "@/components/InviteModal";
 import { generateLeaderboard, type LeaderboardEntry } from "@/lib/leaderboard";
 import { getRivalSeed, setRivalSeed, getRivalBeatenCount, incrementRivalBeaten } from "@/lib/rivalState";
 import { LeaderboardModal } from "@/components/LeaderboardModal";
 import { DoubleOrNothingModal } from "@/components/DoubleOrNothingModal";
+import { checkReferral } from "@/lib/invites";
 
 const ORB_COLORS: Record<string, { bg: string; border: string; glow: string }> = {
   normal: { bg: "from-cyan-400 to-blue-500", border: "border-cyan-300", glow: "shadow-cyan-400/50" },
@@ -48,7 +52,7 @@ const ORB_COLORS: Record<string, { bg: string; border: string; glow: string }> =
   treasure: { bg: "from-amber-400 to-orange-500", border: "border-amber-300", glow: "shadow-amber-400/70" },
 };
 
-type ModalType = "chest" | "wheel" | "shop" | "quests" | "collection" | "leaderboard" | null;
+type ModalType = "chest" | "wheel" | "shop" | "quests" | "collection" | "leaderboard" | "invite" | null;
 
 function App() {
   const { canvasRef, burst, floatText, shockwave } = useParticleCanvas();
@@ -96,6 +100,16 @@ function App() {
   const [showDoubleOrNothing, setShowDoubleOrNothing] = useState(false);
   const [doubleOrNothingGems, setDoubleOrNothingGems] = useState(0);
   const [lastSavedGameGems, setLastSavedGameGems] = useState(0);
+  // NEW: Login reward state
+  const [showLoginReward, setShowLoginReward] = useState(false);
+  const [loginRewardDay, setLoginRewardDay] = useState(1);
+  const [loginRewardStreakBroken, setLoginRewardStreakBroken] = useState(false);
+  // NEW: Squeeze state
+  const [squeezeState, setSqueezeState] = useState<string>("dry");
+  const [squeezeReady, setSqueezeReady] = useState(false);
+  const squeezeStateRef = useRef<string>("dry");
+  // NEW: Invite pending rewards badge
+  const [pendingInviteGems, setPendingInviteGems] = useState(0);
   const shakeTimerRef = useRef<number | null>(null);
   const flashTimerRef = useRef<number | null>(null);
 
@@ -229,6 +243,13 @@ function App() {
       const finalHigh = Math.max(game.highScore, game.score);
       setLeaderboardEntries(generateLeaderboard(finalHigh, rivalSeed));
 
+      // NEW: Record game for squeeze system
+      recordGamePlayedSqueeze().then((result) => {
+        setSqueezeState(result.newState);
+        squeezeStateRef.current = result.newState;
+        setSqueezeReady(result.isReady);
+      });
+
       clearPowerUps();
       setActivePowerUps({ shield: false, extra_life: false, frenzy: false, double: false, freeze: false });
       setPowerUps({ shield: false, extra_life: false, frenzy: false, double: false, freeze: false });
@@ -289,6 +310,9 @@ function App() {
       setPremiumState(true);
     }
 
+    // NEW: Check for referral code in URL
+    checkReferral();
+
     // Load lives
     setLives(getLives());
     setLivesCountdown(getSecondsToNextLife());
@@ -321,6 +345,9 @@ function App() {
         setQuests(parseQuests(stats));
         // Generate initial leaderboard based on loaded high score
         setLeaderboardEntries(generateLeaderboard(stats.high_score, seed));
+        // NEW: Load squeeze state
+        setSqueezeState(stats.squeeze_state ?? "dry");
+        squeezeStateRef.current = stats.squeeze_state ?? "dry";
       } else {
         // New player — generate leaderboard with 0 high score
         setLeaderboardEntries(generateLeaderboard(0, seed));
@@ -344,6 +371,14 @@ function App() {
       setWheelAvailable(await canSpinWheel());
       setCollectionEntries(getCollectionEntries());
       setCollectionStats(getCollectionStats());
+
+      // NEW: Check for login reward
+      const loginCheck = await checkLoginReward();
+      if (loginCheck && loginCheck.available) {
+        setLoginRewardDay(loginCheck.day);
+        setLoginRewardStreakBroken(loginCheck.streakBroken);
+        setTimeout(() => setShowLoginReward(true), 1000);
+      }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -371,6 +406,17 @@ function App() {
     setShowContinueOffer(false);
     setShowDoubleOrNothing(false);
     game.startGame(activePowerUps);
+  };
+
+  // NEW: Go to home from game over
+  const handleGoHome = () => {
+    game.setHighScore(game.highScore);
+    // Force idle state by starting then immediately ending — but we can't do that cleanly.
+    // Instead, we use a simple approach: reload the page to get back to idle.
+    // Actually, the game hook doesn't expose a "goHome" function, so we use a workaround:
+    // We set the game state to idle by calling a simple page-level state reset.
+    // The cleanest way without touching useGame.ts is to reload.
+    window.location.reload();
   };
 
   // Chest with near-miss tease animation
@@ -450,6 +496,22 @@ function App() {
       setLoadedStats((prev) => prev ? { ...prev, gems: (prev.gems ?? 0) + diff } : prev);
     }
     setShowDoubleOrNothing(false);
+  };
+
+  // NEW: Handle login reward claim
+  const handleClaimLoginReward = async () => {
+    const result = await claimLoginReward();
+    if (result) {
+      setGems((g) => g + result.gems);
+      setLoadedStats((prev) => prev ? { ...prev, gems: (prev.gems ?? 0) + result.gems } : prev);
+    }
+  };
+
+  // NEW: Handle invite rewards claimed
+  const handleInviteRewardsClaimed = (claimedGems: number) => {
+    setGems((g) => g + claimedGems);
+    setLoadedStats((prev) => prev ? { ...prev, gems: (prev.gems ?? 0) + claimedGems } : prev);
+    setPendingInviteGems(0);
   };
 
   const shakeStyle = shake > 0 ? { animation: `shake 300ms ease-out` } : undefined;
@@ -633,6 +695,15 @@ function App() {
                 <button onClick={() => setModal("leaderboard")} className="flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl bg-amber-500/15 border border-amber-400/30 text-amber-300 font-bold text-xs sm:text-sm hover:bg-amber-500/25 transition-colors">
                   <Trophy className="w-4 h-4" /> Ranks
                 </button>
+                {/* NEW: Invite button */}
+                <button onClick={() => setModal("invite")} className="flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl bg-cyan-500/15 border border-cyan-400/30 text-cyan-300 font-bold text-xs sm:text-sm hover:bg-cyan-500/25 transition-colors relative">
+                  <Users className="w-4 h-4" /> Invite
+                  {pendingInviteGems > 0 && (
+                    <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-green-500 border border-slate-900 flex items-center justify-center" style={{ animation: "pulseGlow 1s ease-in-out infinite" }}>
+                      <span className="text-[8px] font-black text-white">!</span>
+                    </span>
+                  )}
+                </button>
               </div>
 
               {game.challengeTarget > 0 && !game.challengeDone && (
@@ -774,6 +845,10 @@ function App() {
               <button onClick={() => setModal("leaderboard")} className="mt-3 w-full px-8 py-3 rounded-2xl bg-slate-800/60 border border-slate-700 text-slate-300 font-bold text-sm hover:scale-105 active:scale-95 transition-transform">
                 <span className="flex items-center justify-center gap-2"><Trophy className="w-5 h-5 text-amber-400" /> VIEW RANKINGS</span>
               </button>
+              {/* NEW: Go Home button */}
+              <button onClick={handleGoHome} className="mt-3 w-full px-8 py-3 rounded-2xl bg-slate-800/40 border border-slate-700/60 text-slate-400 font-bold text-sm hover:scale-105 active:scale-95 transition-transform">
+                <span className="flex items-center justify-center gap-2"><Home className="w-5 h-5" /> HOME</span>
+              </button>
               {game.autoRestartCountdown > 0 && (
                 <div className="mt-4 text-slate-400 text-sm">Restarting in <span className="text-cyan-400 font-bold" style={{ animation: "countdownPulse 1s ease-in-out infinite" }}>{game.autoRestartCountdown}</span>s</div>
               )}
@@ -832,6 +907,13 @@ function App() {
                 <div className="flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-full bg-fuchsia-500/10 border border-fuchsia-400/30">
                   <Gem className="w-3 h-3 text-fuchsia-300" />
                   <span className="text-xs text-fuchsia-300 font-black tabular-nums">{game.gems}</span>
+                </div>
+              )}
+              {/* NEW: Squeeze ready indicator */}
+              {squeezeReady && (
+                <div className="flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-full bg-amber-500/15 border border-amber-400/40" style={{ animation: "pulseGlow 1s ease-in-out infinite" }}>
+                  <Sparkles className="w-3 h-3 text-amber-300" />
+                  <span className="text-[9px] sm:text-[10px] text-amber-300 font-bold">BIG REWARD READY!</span>
                 </div>
               )}
               {game.challengeTarget > 0 && !game.challengeDone && (
@@ -1034,7 +1116,7 @@ function App() {
                           legendary: "bg-amber-500", mythic: "bg-rose-500",
                         };
                         return (
-                          <div key={i} className={`w-3 h-3 rounded-full transition-all ${i === chestTeaseIndex ? `${colors[r]} scale-150 shadow-lg` : "bg-slate-700"}`} style={i === chestTeaseIndex ? { animation: "scoreBump 150ms ease-out" } : undefined} />
+                          <div key={i} className={`w-3 h-3 rounded-full transition-all ${i === chestTeaseIndex ? `${colors[r]} scale-150 shadow-lg" : "bg-slate-700"}`} style={i === chestTeaseIndex ? { animation: "scoreBump 150ms ease-out" } : undefined} />
                         );
                       })}
                     </div>
@@ -1178,6 +1260,11 @@ function App() {
             {modal === "leaderboard" && (
               <LeaderboardModal entries={leaderboardEntries} rivalBeatenCount={rivalBeatenCount} onClose={closeModal} />
             )}
+
+            {/* INVITE MODAL */}
+            {modal === "invite" && (
+              <InviteModal open={true} onClose={closeModal} onRewardsClaimed={handleInviteRewardsClaimed} />
+            )}
           </div>
         </div>
       )}
@@ -1202,6 +1289,15 @@ function App() {
 
       {/* PAYWALL MODAL */}
       <PaywallModal open={showPaywall} onClose={() => setShowPaywall(false)} onActivated={handlePaywallActivated} />
+
+      {/* LOGIN REWARD MODAL */}
+      <LoginRewardModal
+        open={showLoginReward}
+        onClose={() => setShowLoginReward(false)}
+        onClaim={handleClaimLoginReward}
+        currentDay={loginRewardDay}
+        streakBroken={loginRewardStreakBroken}
+      />
     </div>
   );
 }
