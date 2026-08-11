@@ -41,6 +41,7 @@ import { MysteryBoxModal } from "@/components/MysteryBoxModal";
 import { TieredChestsModal } from "@/components/TieredChestsModal";
 import { hasDoublePoints } from "@/lib/premium";
 import { type GachaOrb } from "@/lib/gacha";
+import { ShopModal } from "@/components/ShopModal";
 
 
 const ORB_COLORS: Record<string, { bg: string; border: string; glow: string }> = {
@@ -60,7 +61,7 @@ const ORB_COLORS: Record<string, { bg: string; border: string; glow: string }> =
   treasure: { bg: "from-amber-400 to-orange-500", border: "border-amber-300", glow: "shadow-amber-400/70" },
 };
 
-type ModalType = "chest" | "wheel" | "shop" | "quests" | "collection" | "leaderboard" | "invite" | "gacha" | "mystery" | "tiered" | null;
+type ModalType = "chest" | "wheel" | "shop" | "quests" | "collection" | "leaderboard" | "invite" | "gacha" | "mystery" | "tiered" | "shop" | null;
 
 
 function App() {
