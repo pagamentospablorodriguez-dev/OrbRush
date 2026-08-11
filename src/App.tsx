@@ -34,6 +34,14 @@ import { getRivalSeed, setRivalSeed, getRivalBeatenCount, incrementRivalBeaten }
 import { LeaderboardModal } from "@/components/LeaderboardModal";
 import { DoubleOrNothingModal } from "@/components/DoubleOrNothingModal";
 import { checkReferral } from "@/lib/invites";
+import { TemptationOfferModal } from "@/components/TemptationOfferModal";
+import { FirstGameOverOfferModal } from "@/components/FirstGameOverOfferModal";
+import { GachaModal } from "@/components/GachaModal";
+import { MysteryBoxModal } from "@/components/MysteryBoxModal";
+import { TieredChestsModal } from "@/components/TieredChestsModal";
+import { hasDoublePoints } from "@/lib/premium";
+import { type GachaOrb } from "@/lib/gacha";
+
 
 const ORB_COLORS: Record<string, { bg: string; border: string; glow: string }> = {
   normal: { bg: "from-cyan-400 to-blue-500", border: "border-cyan-300", glow: "shadow-cyan-400/50" },
@@ -52,7 +60,8 @@ const ORB_COLORS: Record<string, { bg: string; border: string; glow: string }> =
   treasure: { bg: "from-amber-400 to-orange-500", border: "border-amber-300", glow: "shadow-amber-400/70" },
 };
 
-type ModalType = "chest" | "wheel" | "shop" | "quests" | "collection" | "leaderboard" | "invite" | null;
+type ModalType = "chest" | "wheel" | "shop" | "quests" | "collection" | "leaderboard" | "invite" | "gacha" | "mystery" | "tiered" | null;
+
 
 function App() {
   const { canvasRef, burst, floatText, shockwave } = useParticleCanvas();
@@ -110,6 +119,10 @@ function App() {
   const squeezeStateRef = useRef<string>("dry");
   // NEW: Invite pending rewards badge
   const [pendingInviteGems, setPendingInviteGems] = useState(0);
+  const [showTemptation, setShowTemptation] = useState(false);
+const [showFirstOffer, setShowFirstOffer] = useState(false);
+const [gachaPity, setGachaPity] = useState(0);
+
   const shakeTimerRef = useRef<number | null>(null);
   const flashTimerRef = useRef<number | null>(null);
 
@@ -199,7 +212,10 @@ function App() {
   // Game over save
   useEffect(() => {
     if (game.gameState === "gameover") {
-      const newHigh = Math.max(game.highScore, game.score);
+      const is2x = hasDoublePoints();
+const finalScore = is2x ? game.score * 2 : game.score;
+const newHigh = Math.max(game.highScore, finalScore);
+
       const newBestCombo = Math.max(loadedStats?.bestCombo ?? 0, game.bestCombo);
       const gemsEarned = game.gems;
       saveStats({
@@ -273,6 +289,20 @@ function App() {
         }
       }
     }
+
+    // Oferta de Pico de Dopamina (Jackpot ou Recorde)
+if (game.newRecord || game.totalJackpots > 0) {
+  setTimeout(() => setShowTemptation(true), 800);
+}
+
+// Oferta de Primeiro Game Over
+if (!loadedStats?.firstOffered) {
+  setTimeout(() => {
+    setShowFirstOffer(true);
+    saveStats({ first_gameover_offered: true });
+  }, 1500);
+}
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game.gameState]);
 
@@ -519,6 +549,12 @@ function App() {
     setLoadedStats((prev) => prev ? { ...prev, gems: (prev.gems ?? 0) + claimedGems } : prev);
     setPendingInviteGems(0);
   };
+  const handleGachaPull = (orb: GachaOrb, newPity: number) => {
+  setGems(g => g - 100);
+  setGachaPity(newPity);
+  saveStats({ gems: gems - 100, gacha_pity: newPity });
+};
+
 
   const shakeStyle = shake > 0 ? { animation: `shake 300ms ease-out` } : undefined;
   const activePowerUpCount = Object.values(activePowerUps).filter(Boolean).length;
@@ -711,6 +747,13 @@ function App() {
                   )}
                 </button>
               </div>
+              {/* NOVOS BOTÕES DE MONETIZAÇÃO */}
+<div className="grid grid-cols-3 gap-2 mt-3">
+  <button onClick={() => setModal("gacha")} className="py-2.5 bg-purple-900/40 hover:bg-purple-800/50 text-purple-300 font-bold rounded-xl border border-purple-500/30 transition-colors flex flex-col items-center text-[10px]"><Swords className="w-4 h-4 mb-1" /> SUMMON</button>
+  <button onClick={() => setModal("mystery")} className="py-2.5 bg-amber-900/40 hover:bg-amber-800/50 text-amber-300 font-bold rounded-xl border border-amber-500/30 transition-colors flex flex-col items-center text-[10px]"><Timer className="w-4 h-4 mb-1" /> BOX</button>
+  <button onClick={() => setModal("tiered")} className="py-2.5 bg-emerald-900/40 hover:bg-emerald-800/50 text-emerald-300 font-bold rounded-xl border border-emerald-500/30 transition-colors flex flex-col items-center text-[10px]"><Gift className="w-4 h-4 mb-1" /> CHESTS</button>
+</div>
+
 
               {game.challengeTarget > 0 && !game.challengeDone && (
                 <div className="mb-5 flex items-center justify-center gap-3 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl bg-green-500/10 border border-green-400/30">
@@ -1284,8 +1327,14 @@ function App() {
 
             {/* INVITE MODAL */}
             {modal === "invite" && (
-              <InviteModal open={true} onClose={closeModal} onRewardsClaimed={handleInviteRewardsClaimed} />
-            )}
+              <InviteModal open={true} onClose={closeModal} onRewardsClaimed={handleInviteRewardsClaimed}  />
+            )} 
+            {modal === "gacha" && <GachaModal open={true} onClose={closeModal} gems={gems} pity={gachaPity} onPull={handleGachaPull} />}
+{modal === "mystery" && <MysteryBoxModal open={true} onClose={closeModal} />}
+{modal === "tiered" && <TieredChestsModal open={true} onClose={closeModal} gems={gems} />}
+{showTemptation && <TemptationOfferModal open={true} onClose={() => setShowTemptation(false)} />}
+{showFirstOffer && <FirstGameOverOfferModal open={true} onClose={() => setShowFirstOffer(false)} />}
+
           </div>
         </div>
       )}
