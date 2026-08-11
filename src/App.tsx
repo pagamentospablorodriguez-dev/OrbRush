@@ -61,7 +61,7 @@ const ORB_COLORS: Record<string, { bg: string; border: string; glow: string }> =
   treasure: { bg: "from-amber-400 to-orange-500", border: "border-amber-300", glow: "shadow-amber-400/70" },
 };
 
-type ModalType = "chest" | "wheel" | "shop" | "quests" | "collection" | "leaderboard" | "invite" | "gacha" | "mystery" | "tiered" | "shop" | null;
+type ModalType = "chest" | "wheel" | "shop" | "quests" | "collection" | "leaderboard" | "invite" | "gacha" | "mystery" | "tiered" | "gemShop" | null;
 
 
 function App() {
@@ -551,10 +551,14 @@ if (!loadedStats?.firstOffered) {
     setPendingInviteGems(0);
   };
   const handleGachaPull = (orb: GachaOrb, newPity: number) => {
-  setGems(g => g - 100);
+  setGems(prevGems => {
+    const updatedGems = prevGems - 100;
+    saveStats({ gems: updatedGems, gacha_pity: newPity });
+    return updatedGems;
+  });
   setGachaPity(newPity);
-  saveStats({ gems: gems - 100, gacha_pity: newPity });
 };
+
 
 
   const shakeStyle = shake > 0 ? { animation: `shake 300ms ease-out` } : undefined;
@@ -656,6 +660,23 @@ if (!loadedStats?.firstOffered) {
                 </div>
               )}
 
+
+              {/* GEMS COUNTER + SHOP BUTTON */}
+<div className="absolute top-4 right-4 z-50">
+  <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900/80 backdrop-blur-md border border-slate-700/50 rounded-full shadow-lg">
+    <Gem className="w-3.5 h-3.5 text-emerald-400" fill="currentColor" />
+    <span className="text-xs font-black text-white tabular-nums">{gems}</span>
+    <button 
+      onClick={() => setModal("gemShop")} 
+      className="ml-1 w-5 h-5 bg-emerald-500 hover:bg-emerald-400 rounded-full flex items-center justify-center text-slate-950 font-black shadow-lg transition-transform active:scale-90"
+    >
+      <span className="mt-[-2px]">+</span>
+    </button>
+  </div>
+</div>
+
+
+              
               {/* Lives indicator (non-premium) */}
               {!premium && (
                 <div className="mb-3 inline-flex items-center gap-2 px-3 sm:px-4 py-2 rounded-full bg-rose-500/15 border border-rose-400/30">
@@ -953,12 +974,14 @@ if (!loadedStats?.firstOffered) {
                   <span className="text-xs text-green-400 font-black tabular-nums">{game.luckyMult.toFixed(1)}x</span>
                 </div>
               )}
-              {game.gems > 0 && (
-                <div className="flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-full bg-fuchsia-500/10 border border-fuchsia-400/30">
-                  <Gem className="w-3 h-3 text-fuchsia-300" />
-                  <span className="text-xs text-fuchsia-300 font-black tabular-nums">{game.gems}</span>
-                </div>
-              )}
+             {gems > 0 && (
+  <div className="flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-full bg-fuchsia-500/10 border border-fuchsia-400/30">
+    <Gem className="w-3 h-3 text-fuchsia-300" />
+    <span className="text-xs text-fuchsia-300 font-black tabular-nums">{gems}</span>
+    <button onClick={() => setModal("gemShop")} className="ml-1 w-4 h-4 bg-fuchsia-500 rounded-full flex items-center justify-center text-slate-950 text-[10px] font-black">+</button>
+  </div>
+)}
+
               {/* NEW: Squeeze ready indicator */}
               {squeezeReady && (
                 <div className="flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-full bg-amber-500/15 border border-amber-400/40" style={{ animation: "pulseGlow 1s ease-in-out infinite" }}>
@@ -1335,6 +1358,8 @@ if (!loadedStats?.firstOffered) {
 {modal === "tiered" && <TieredChestsModal open={true} onClose={closeModal} gems={gems} />}
 {showTemptation && <TemptationOfferModal open={true} onClose={() => setShowTemptation(false)} />}
 {showFirstOffer && <FirstGameOverOfferModal open={true} onClose={() => setShowFirstOffer(false)} />}
+            {modal === "gemShop" && <ShopModal open={true} onClose={closeModal} />}
+
 
           </div>
         </div>
