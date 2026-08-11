@@ -63,6 +63,9 @@ export interface PlayerStats {
   invite_count: number;
   invited_by: string | null;
   invite_reward_claimed: boolean;
+  gacha_pity: number;
+first_gameover_offered: boolean;
+
 }
 
 const DEFAULT_STATS: Omit<PlayerStats, "id" | "device_id"> = {
@@ -118,6 +121,9 @@ const DEFAULT_STATS: Omit<PlayerStats, "id" | "device_id"> = {
   invite_count: 0,
   invited_by: null,
   invite_reward_claimed: false,
+  gacha_pity: 0,
+first_gameover_offered: false,
+
 };
 
 export async function loadStats(): Promise<PlayerStats | null> {
