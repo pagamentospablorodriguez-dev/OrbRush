@@ -329,3 +329,23 @@ export function playLossChase() {
   tone(660, 0.15, "triangle", 0.15, 0.08, 880);
   tone(880, 0.2, "triangle", 0.18, 0.16);
 }
+
+// --- NEW: Chest near-miss sound (rarities below legendary) ---
+export function playChestNearMiss() {
+  tone(600, 0.15, "sine", 0.12, 0, 400);
+  tone(400, 0.2, "sine", 0.1, 0.1, 250);
+  tone(250, 0.3, "sine", 0.08, 0.2, 150);
+}
+
+// --- NEW: Almost-jackpot frantic build-up sound ---
+export function playAlmostJackpot() {
+  const notes = [523, 587, 659, 698, 784, 880, 988, 1046, 1175, 1318, 1568, 2093];
+  notes.forEach((n, i) => tone(n, 0.06, "square", 0.1, i * 0.03));
+}
+
+// --- NEW: Combo grief punishment sound ---
+export function playComboGrief() {
+  tone(200, 0.3, "sawtooth", 0.15, 0, 100);
+  tone(150, 0.4, "sawtooth", 0.12, 0.1, 80);
+  noiseBurst(0.2, 0.08);
+}
