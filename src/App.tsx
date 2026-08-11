@@ -1116,7 +1116,15 @@ function App() {
                           legendary: "bg-amber-500", mythic: "bg-rose-500",
                         };
                         return (
-                          <div key={i} className={`w-3 h-3 rounded-full transition-all ${i === chestTeaseIndex ? `${colors[r]} scale-150 shadow-lg" : "bg-slate-700"}`} style={i === chestTeaseIndex ? { animation: "scoreBump 150ms ease-out" } : undefined} />
+                          <div
+  key={i}
+  className={`w-3 h-3 rounded-full transition-all ${
+    i === chestTeaseIndex
+      ? `${colors[r]} scale-150 shadow-lg`
+      : "bg-slate-700"
+  }`}
+  style={i === chestTeaseIndex ? { animation: "scoreBump 150ms ease-out" } : undefined}
+/>
                         );
                       })}
                     </div>
