@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { useParticleCanvas } from "@/lib/particles";
 import { useGame, type Orb, type Achievement, type PowerUps } from "@/lib/useGame";
-import { setMuted, isMuted, playChestTease, playChestReveal, playSocialNotification, playLossChase, playCountdown } from "@/lib/sound";
+import { setMuted, isMuted, playChestTease, playChestReveal, playChestNearMiss, playSocialNotification, playLossChase, playCountdown } from "@/lib/sound";
 import {
   loadStats, saveStats, updateDailyStreak, rollDailyChallenge, updateChallengeProgress,
   rollDailyQuests, updateQuestProgress, claimQuestRewards, canSpinWheel, spinWheelSave,
@@ -435,7 +435,13 @@ function App() {
         setChestOpening(false);
         setChestReward(reward);
         setGems((g) => g + reward.gems);
-        playChestReveal();
+        // Near-miss sound: legendary/mythic get the triumphant reveal,
+        // everything below gets the "quase!" near-miss sound
+        if (reward.rarity === "legendary" || reward.rarity === "mythic") {
+          playChestReveal();
+        } else {
+          playChestNearMiss();
+        }
         saveStats({ gems: (loadedStats?.gems ?? 0) + game.gems + reward.gems });
         const ri = rarityIndex(reward.rarity);
         if (ri > (loadedStats?.totalJackpots ?? 0)) saveStats({ best_rarity: ri });
@@ -914,6 +920,13 @@ function App() {
                 <div className="flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-full bg-amber-500/15 border border-amber-400/40" style={{ animation: "pulseGlow 1s ease-in-out infinite" }}>
                   <Sparkles className="w-3 h-3 text-amber-300" />
                   <span className="text-[9px] sm:text-[10px] text-amber-300 font-bold">BIG REWARD READY!</span>
+                </div>
+              )}
+              {/* NEW: Almost-jackpot rising indicator */}
+              {game.almostJackpotActive && (
+                <div className="flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-full bg-amber-500/20 border-2 border-amber-400/50" style={{ animation: "pulseGlow 0.5s ease-in-out infinite" }}>
+                  <Zap className="w-3 h-3 text-amber-300" fill="currentColor" />
+                  <span className="text-[9px] sm:text-[10px] text-amber-300 font-black">JACKPOT RISING?!</span>
                 </div>
               )}
               {game.challengeTarget > 0 && !game.challengeDone && (
