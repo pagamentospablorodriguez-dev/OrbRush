@@ -35,8 +35,11 @@ import {
   playStreakBonus,
   playGhost,
   playCollectionNew,
+  playAlmostJackpot,
+  playComboGrief,
 } from "./sound";
 import { recordDiscovery } from "./collection";
+import { getSqueezeMultiplier, consumeSqueezeReward } from "./supabase";
 
 export type OrbType =
   | "normal"
@@ -181,6 +184,7 @@ export function useGame(callbacks: GameCallbacks) {
   const [firstWinToday, setFirstWinToday] = useState(false);
   const [firstWinClaimed, setFirstWinClaimed] = useState(false);
   const [collectionDiscovered, setCollectionDiscovered] = useState(0);
+  const [almostJackpotActive, setAlmostJackpotActive] = useState(false);
 
   const orbIdRef = useRef(0);
   const comboTimerRef = useRef<number | null>(null);
@@ -226,6 +230,10 @@ export function useGame(callbacks: GameCallbacks) {
   const collectionDiscoveredRef = useRef(0);
   const callbacksRef = useRef(callbacks);
   callbacksRef.current = callbacks;
+  const squeezeMultRef = useRef(1);
+  const almostJackpotPrimedRef = useRef(false);
+  const almostJackpotAnimatingRef = useRef(false);
+  const almostJackpotAnimTimerRef = useRef<number | null>(null);
 
   const syncRefs = () => {
     stateRef.current = gameState;
@@ -480,6 +488,7 @@ export function useGame(callbacks: GameCallbacks) {
     if (doubleTimerRef.current) { clearInterval(doubleTimerRef.current); doubleTimerRef.current = null; }
     if (comboTimerRef.current) { clearTimeout(comboTimerRef.current); comboTimerRef.current = null; }
     if (comboDecayRef.current) { cancelAnimationFrame(comboDecayRef.current); comboDecayRef.current = null; }
+    if (almostJackpotAnimTimerRef.current) { clearInterval(almostJackpotAnimTimerRef.current); almostJackpotAnimTimerRef.current = null; }
     setOrbs([]);
     setFrenzy(false);
     frenzyRef.current = false;
@@ -496,6 +505,9 @@ export function useGame(callbacks: GameCallbacks) {
     setDoublePoints(false);
     doublePointsRef.current = false;
     setComboDecay(0);
+    setAlmostJackpotActive(false);
+    almostJackpotPrimedRef.current = false;
+    almostJackpotAnimatingRef.current = false;
 
     const finalScore = scoreRef.current;
     const gap = highScoreRef.current - finalScore;
@@ -638,6 +650,19 @@ export function useGame(callbacks: GameCallbacks) {
   const tapOrb = useCallback(
     (orb: Orb, clientX: number, clientY: number) => {
       if (stateRef.current !== "playing") return;
+
+      // Almost-jackpot: if primed, this tap triggers the "SO CLOSE!" letdown
+      if (almostJackpotPrimedRef.current) {
+        almostJackpotPrimedRef.current = false;
+        setAlmostJackpotActive(false);
+        callbacksRef.current.onFloatText(50, 50, "SO CLOSE! Jackpot was 1 tap away!", "#f97316", 40);
+        callbacksRef.current.onFlash("rgba(249,115,22,0.25)");
+        callbacksRef.current.onScreenShake(10);
+        playSoClose();
+        setProgressiveJackpot(0);
+        progressiveRef.current = 0;
+      }
+
       const rect = document.getElementById("game-area")?.getBoundingClientRect();
       if (!rect) return;
       const px = ((clientX - rect.left) / rect.width) * 100;
@@ -763,6 +788,32 @@ export function useGame(callbacks: GameCallbacks) {
       setProgressiveJackpot(newProg);
       progressiveRef.current = newProg;
       if (newCombo % 10 === 0) playProgressiveTick();
+
+      // Almost-jackpot trigger: 0.5% chance per tap when progressive > 500
+      if (progressiveRef.current > 500 && !almostJackpotPrimedRef.current && !almostJackpotAnimatingRef.current) {
+        if (Math.random() < 0.005) {
+          almostJackpotAnimatingRef.current = true;
+          setAlmostJackpotActive(true);
+          playAlmostJackpot();
+          callbacksRef.current.onFlash("rgba(251,191,36,0.3)");
+          callbacksRef.current.onFloatText(50, 45, "JACKPOT RISING?!", "#fbbf24", 44);
+          callbacksRef.current.onScreenShake(8);
+          let riseCount = 0;
+          if (almostJackpotAnimTimerRef.current) clearInterval(almostJackpotAnimTimerRef.current);
+          almostJackpotAnimTimerRef.current = window.setInterval(() => {
+            riseCount++;
+            const inc = 50 + riseCount * 25;
+            setProgressiveJackpot((p) => { const np = p + inc; progressiveRef.current = np; return np; });
+            playProgressiveTick();
+            if (riseCount % 3 === 0) callbacksRef.current.onFlash("rgba(251,191,36,0.12)");
+            if (riseCount >= 15) {
+              if (almostJackpotAnimTimerRef.current) { clearInterval(almostJackpotAnimTimerRef.current); almostJackpotAnimTimerRef.current = null; }
+              almostJackpotAnimatingRef.current = false;
+              almostJackpotPrimedRef.current = true;
+            }
+          }, 80);
+        }
+      }
 
       let basePoints = 10;
       let color = "#22d3ee";
@@ -927,18 +978,24 @@ export function useGame(callbacks: GameCallbacks) {
           roll -= o.w;
           if (roll <= 0) { chosen = o; break; }
         }
-        basePoints = chosen.pts;
+        // Apply squeeze multiplier to treasure payout
+        basePoints = Math.floor(chosen.pts * squeezeMultRef.current);
         color = "#fbbf24";
-        particleCount = 40 + chosen.pts / 20;
+        particleCount = 40 + basePoints / 20;
         particleShape = "star";
         playTreasureOpen();
-        floatText = `TREASURE ${chosen.label}`;
-        callbacksRef.current.onShockwave(px, py, 250 + chosen.pts / 10, "#fbbf24");
+        floatText = `TREASURE +${basePoints}!`;
+        callbacksRef.current.onShockwave(px, py, 250 + basePoints / 10, "#fbbf24");
         callbacksRef.current.onFlash("rgba(251,191,36,0.2)");
         callbacksRef.current.onScreenShake(15);
         unlock("treasure_1");
         questProgress("treasure_1", 1, true);
         trackDiscovery("treasure", "Treasure Orb", "💎");
+        // If squeeze was in "ready" state (multiplier > 1), consume the reward and go back to dry
+        if (squeezeMultRef.current > 1) {
+          squeezeMultRef.current = 0.4;
+          consumeSqueezeReward();
+        }
       } else {
         playTap(newCombo);
         setLuckyStreak(0);
@@ -1093,6 +1150,10 @@ export function useGame(callbacks: GameCallbacks) {
     setRecordGap(0);
     setAdrenaline(false);
     adrenalineRef.current = false;
+    setAlmostJackpotActive(false);
+    almostJackpotPrimedRef.current = false;
+    almostJackpotAnimatingRef.current = false;
+    if (almostJackpotAnimTimerRef.current) { clearInterval(almostJackpotAnimTimerRef.current); almostJackpotAnimTimerRef.current = null; }
     scoreRef.current = 0;
     comboRef.current = 0;
     levelRef.current = 1;
@@ -1115,6 +1176,10 @@ export function useGame(callbacks: GameCallbacks) {
     gemsRef.current = 0;
     if (autoRestartRef.current) { clearInterval(autoRestartRef.current); autoRestartRef.current = null; }
     stopDrone();
+
+    // Fetch squeeze multiplier for this game session
+    squeezeMultRef.current = 1;
+    getSqueezeMultiplier().then((m) => { squeezeMultRef.current = m; });
 
     if (powerUps?.shield) {
       setHasShield(true);
@@ -1162,7 +1227,7 @@ export function useGame(callbacks: GameCallbacks) {
     startSpawnLoop();
   }, [startSpawnLoop, startDoublePoints]);
 
-  // Expire orbs that reach their ttl — with near-miss feedback
+  // Expire orbs that reach their ttl — with near-miss feedback and combo grief
   useEffect(() => {
     if (gameState !== "playing") return;
     const interval = setInterval(() => {
@@ -1190,6 +1255,16 @@ export function useGame(callbacks: GameCallbacks) {
           callbacksRef.current.onFloatText(50, 50, "SO CLOSE!", "#f97316", 28);
         }
         if (missedNormal) {
+          // Combo grief: if combo was 20+, lose 10% of current score
+          if (comboRef.current >= 20) {
+            const penalty = Math.floor(scoreRef.current * 0.1);
+            if (penalty > 0) {
+              setScore((s) => { const ns = Math.max(0, s - penalty); scoreRef.current = ns; return ns; });
+              callbacksRef.current.onFloatText(50, 55, `COMBO GRIEF! -${penalty}`, "#ef4444", 36);
+              callbacksRef.current.onScreenShake(12);
+              playComboGrief();
+            }
+          }
           resetCombo(true);
         }
         if (bossExpired) {
@@ -1256,6 +1331,7 @@ export function useGame(callbacks: GameCallbacks) {
     recordGap,
     firstWinToday,
     collectionDiscovered,
+    almostJackpotActive,
     setHighScore,
     setDailyStreak,
     setPrestige,
