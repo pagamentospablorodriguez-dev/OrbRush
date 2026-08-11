@@ -5,14 +5,14 @@ import { addGems } from "./supabase";
 // No Stripe Dashboard: Products → Create product → Payment Link
 // Para cada link, configure o "After payment" redirect URL para a URL de ativação correspondente.
 export const STRIPE_LINKS = {
-  TEMPTATION_OFFER: "SEU_LINK_STRIPE_2.99",
-  FIRST_GAME_OVER: "SEU_LINK_STRIPE_0.99",
-  GEMS_100: "SEU_LINK_STRIPE_GEMS_100",
-  GEMS_600: "SEU_LINK_STRIPE_GEMS_600",
-  GEMS_1500: "SEU_LINK_STRIPE_GEMS_1500",
-  GEMS_5000: "SEU_LINK_STRIPE_GEMS_5000",
-  SHIELD_PERM: "SEU_LINK_STRIPE_SHIELD_PERM",
-  MYSTERY_BOX_UNLOCK: "SEU_LINK_STRIPE_SKIP_TIMER",
+  TEMPTATION_OFFER: "https://buy.stripe.com/00w7sLfDP6bo8N58Inb7y0a",
+  FIRST_GAME_OVER: "https://buy.stripe.com/6oU3cv9fr0R4fbtcYDb7y0b",
+  GEMS_100: "https://buy.stripe.com/cNi14n3V743g4wP8Inb7y0c",
+  GEMS_600: "https://buy.stripe.com/28E4gz8bneHU1kD6Afb7y0d",
+  GEMS_1500: "https://buy.stripe.com/dRm4gz9frdDQ8N56Afb7y0e",
+  GEMS_5000: "https://buy.stripe.com/28E8wP9fr6bo6EX1fVb7y0f",
+  SHIELD_PERM: "https://buy.stripe.com/fZu28r2R36bo4wP9Mrb7y0g",
+  MYSTERY_BOX_UNLOCK: "https://buy.stripe.com/dRm7sL77jfLY1kDe2Hb7y0h",
 };
 
 // === ACTIVATION CODES ===
