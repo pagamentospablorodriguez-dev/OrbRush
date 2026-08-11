@@ -1,5 +1,8 @@
 const PREMIUM_KEY = "orbrush_premium";
 
+const DOUBLE_POINTS_KEY = "orbrush_2x_points";
+
+
 // Single universal activation code — same for everyone.
 // Used in URL: orbrush.fun/activate?code=ORBRUSH-VIP-2024
 export const UNIVERSAL_ACTIVATION_CODE = "ORBRUSH-VIP-2024";
@@ -21,19 +24,46 @@ export function setPremium(value: boolean): void {
   } catch {}
 }
 
+export function hasDoublePoints(): boolean {
+  try {
+    return localStorage.getItem(DOUBLE_POINTS_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+export function setDoublePoints(value: boolean): void {
+  try {
+    localStorage.setItem(DOUBLE_POINTS_KEY, value ? "true" : "false");
+  } catch {}
+}
+
+
 // Check URL for activation code on load. If present and valid, activate premium.
 // Then strip it from the URL so nobody can copy it.
 export function checkUrlActivation(): boolean {
   try {
     const url = new URL(window.location.href);
     const code = url.searchParams.get("code");
+    const activate = url.searchParams.get("activate"); // NOVO
     const pathname = url.pathname;
 
-    // Support both /activate?code=XXX and ?code=XXX
+    let activated = false;
+
     if (code && code.toUpperCase() === UNIVERSAL_ACTIVATION_CODE) {
       setPremium(true);
-      // Strip the code from the URL
       url.searchParams.delete("code");
+      activated = true;
+    }
+
+    // NOVO: Ativação de 2x pontos via URL
+    if (activate === "2x_points") {
+      setDoublePoints(true);
+      url.searchParams.delete("activate");
+      activated = true;
+    }
+
+    if (activated) {
       const cleanPath = pathname === "/activate" ? "/" : pathname;
       window.history.replaceState({}, "", url.origin + cleanPath + (url.searchParams.toString() ? "?" + url.searchParams.toString() : ""));
       return true;
@@ -41,6 +71,7 @@ export function checkUrlActivation(): boolean {
   } catch {}
   return false;
 }
+
 
 export async function activateWithCode(code: string): Promise<{ valid: boolean; message: string }> {
   if (code.toUpperCase() === UNIVERSAL_ACTIVATION_CODE) {
