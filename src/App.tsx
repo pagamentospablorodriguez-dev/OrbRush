@@ -22,8 +22,10 @@ import { POWER_UPS } from "@/lib/shop";
 import { getCollectionEntries, getCollectionStats, type CollectionEntry } from "@/lib/collection";
 import { rollSocialNotification, randomSocialDelay, type SocialNotification } from "@/lib/social";
 import { getLossChaseBonus, type LossChaseBonus } from "@/lib/lossChase";
-import { isPremium, incrementPlayCount, hasPaywallBeenShown, setPaywallShown, resetPaywallState, setLockout24h, isLockedOut, clearLockout, resetPlayCount, checkUrlActivation } from "@/lib/premium";
+import { isPremium, checkUrlActivation } from "@/lib/premium";
+import { getLives, consumeLife, getSecondsToNextLife, MAX_LIVES } from "@/lib/lives";
 import { PaywallModal } from "@/components/PaywallModal";
+import { ContinueOfferModal } from "@/components/ContinueOfferModal";
 import { generateLeaderboard, type LeaderboardEntry } from "@/lib/leaderboard";
 import { getRivalSeed, setRivalSeed, getRivalBeatenCount, incrementRivalBeaten } from "@/lib/rivalState";
 import { LeaderboardModal } from "@/components/LeaderboardModal";
@@ -83,8 +85,10 @@ function App() {
   const [showStreakWarning, setShowStreakWarning] = useState(false);
   const [collectionPopup, setCollectionPopup] = useState<{ label: string; icon: string } | null>(null);
   const [showPaywall, setShowPaywall] = useState(false);
-  const [lockoutActive, setLockoutActive] = useState(false);
   const [premium, setPremiumState] = useState(isPremium());
+  const [lives, setLives] = useState(MAX_LIVES);
+  const [livesCountdown, setLivesCountdown] = useState(0);
+  const [showContinueOffer, setShowContinueOffer] = useState(false);
   const [leaderboardEntries, setLeaderboardEntries] = useState<LeaderboardEntry[]>([]);
   const [rivalBeatenCount, setRivalBeatenCount] = useState(0);
   const [rivalSeed, setRivalSeedState] = useState(0);
@@ -238,16 +242,13 @@ function App() {
         }, 800);
       }
 
-      // Paywall logic: show after 3 games for non-premium users
+      // Show continue offer for non-premium players when out of lives
       if (!premium) {
-        const playCount = incrementPlayCount();
-        if (playCount >= 3 && !hasPaywallBeenShown()) {
+        const currentLives = getLives();
+        if (currentLives <= 0) {
           setTimeout(() => {
-            setShowPaywall(true);
-            setPaywallShown(true);
-            setLockout24h();
-            setLockoutActive(true);
-          }, 1200);
+            setShowContinueOffer(true);
+          }, 1500);
         }
       }
     }
@@ -263,6 +264,18 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game.score]);
 
+  // Lives recharge countdown
+  useEffect(() => {
+    const updateLives = () => {
+      const currentLives = getLives();
+      setLives(currentLives);
+      setLivesCountdown(getSecondsToNextLife());
+    };
+    updateLives();
+    const timer = setInterval(updateLives, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
   const refreshQuests = useCallback(async () => {
     const stats = await rollDailyQuests();
     if (stats) { setQuests(parseQuests(stats)); setGems(stats.gems ?? 0); }
@@ -276,11 +289,9 @@ function App() {
       setPremiumState(true);
     }
 
-    // Check lockout state
-    if (isLockedOut() && !isPremium()) {
-      setLockoutActive(true);
-      setShowPaywall(true);
-    }
+    // Load lives
+    setLives(getLives());
+    setLivesCountdown(getSecondsToNextLife());
 
     // Load rival seed
     const seed = getRivalSeed();
@@ -345,12 +356,19 @@ function App() {
   };
 
   const handleStartGame = () => {
-    // Block if locked out
-    if (lockoutActive || isLockedOut()) {
-      setShowPaywall(true);
-      return;
+    // Block if no lives (non-premium)
+    if (!premium) {
+      const currentLives = getLives();
+      if (currentLives <= 0) {
+        setShowPaywall(true);
+        return;
+      }
+      consumeLife();
+      setLives(getLives());
+      setLivesCountdown(getSecondsToNextLife());
     }
     setLossChase({ active: false, multiplier: 1, secondsLeft: 0, reason: "" });
+    setShowContinueOffer(false);
     setShowDoubleOrNothing(false);
     game.startGame(activePowerUps);
   };
@@ -417,10 +435,9 @@ function App() {
   const handlePaywallActivated = () => {
     setPremiumState(true);
     setShowPaywall(false);
-    setLockoutActive(false);
-    clearLockout();
-    resetPlayCount();
-    resetPaywallState();
+    setShowContinueOffer(false);
+    setLives(MAX_LIVES);
+    setLivesCountdown(0);
   };
 
   const handleDoubleOrNothingCollect = (finalGems: number) => {
@@ -534,6 +551,25 @@ function App() {
                 </div>
               )}
 
+              {/* Lives indicator (non-premium) */}
+              {!premium && (
+                <div className="mb-3 inline-flex items-center gap-2 px-3 sm:px-4 py-2 rounded-full bg-rose-500/15 border border-rose-400/30">
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: MAX_LIVES }).map((_, i) => (
+                      <Heart key={i} className={`w-3.5 h-3.5 ${i < lives ? "text-rose-500 fill-rose-500" : "text-slate-700"}`} />
+                    ))}
+                  </div>
+                  {lives < MAX_LIVES && livesCountdown > 0 && (
+                    <span className="text-rose-300 text-xs font-bold tabular-nums">
+                      {Math.floor(livesCountdown / 60)}:{(livesCountdown % 60).toString().padStart(2, "0")}
+                    </span>
+                  )}
+                  {lives === 0 && (
+                    <span className="text-rose-400 text-xs font-black">No lives!</span>
+                  )}
+                </div>
+              )}
+
               <div className="mb-5 flex justify-center gap-2">
                 {[Star, Zap, Flame, Crown, Shield].map((Icon, i) => (
                   <div key={i} className="w-11 h-11 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-cyan-500/20 to-blue-600/20 border border-cyan-400/30 flex items-center justify-center" style={{ animation: `orbPulse 1.5s ease-in-out ${i * 0.2}s infinite` }}>
@@ -640,7 +676,7 @@ function App() {
               )}
 
               <button onClick={handleStartGame} className="group relative px-10 sm:px-12 py-3.5 sm:py-4 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold text-lg sm:text-xl shadow-2xl shadow-cyan-500/40 hover:scale-105 active:scale-95 transition-transform">
-                <span className="flex items-center gap-3"><Play className="w-5 h-5 sm:w-6 sm:h-6" fill="white" />PLAY</span>
+                <span className="flex items-center gap-3"><Play className="w-5 h-5 sm:w-6 sm:h-6" fill="white" />{!premium && lives <= 0 ? "GET LIVES" : "PLAY"}</span>
               </button>
 
               <div className="mt-5 flex flex-wrap gap-1 justify-center text-[10px] sm:text-[11px] text-slate-500 max-w-md mx-auto">
@@ -733,7 +769,7 @@ function App() {
                 </button>
               )}
               <button onClick={handleStartGame} className={`group w-full px-10 py-4 rounded-2xl text-white font-bold text-base sm:text-lg shadow-2xl hover:scale-105 active:scale-95 transition-transform ${lossChaseActive ? "bg-gradient-to-r from-orange-500 to-red-600 shadow-orange-500/40" : "bg-gradient-to-r from-cyan-500 to-blue-600 shadow-cyan-500/40"}`}>
-                <span className="flex items-center justify-center gap-2"><RotateCcw className="w-5 h-5" /> {lossChaseActive ? `PLAY (${lossChase.multiplier}x BONUS!)` : "PLAY AGAIN"}</span>
+                <span className="flex items-center justify-center gap-2"><RotateCcw className="w-5 h-5" /> {lossChaseActive ? `PLAY (${lossChase.multiplier}x BONUS!)` : !premium && lives <= 0 ? "GET LIVES" : "PLAY AGAIN"}</span>
               </button>
               <button onClick={() => setModal("leaderboard")} className="mt-3 w-full px-8 py-3 rounded-2xl bg-slate-800/60 border border-slate-700 text-slate-300 font-bold text-sm hover:scale-105 active:scale-95 transition-transform">
                 <span className="flex items-center justify-center gap-2"><Trophy className="w-5 h-5 text-amber-400" /> VIEW RANKINGS</span>
@@ -1156,6 +1192,13 @@ function App() {
           }}
         />
       )}
+
+      {/* CONTINUE OFFER MODAL */}
+      <ContinueOfferModal
+        open={showContinueOffer}
+        onClose={() => setShowContinueOffer(false)}
+        onActivated={handlePaywallActivated}
+      />
 
       {/* PAYWALL MODAL */}
       <PaywallModal open={showPaywall} onClose={() => setShowPaywall(false)} onActivated={handlePaywallActivated} />
