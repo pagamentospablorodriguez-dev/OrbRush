@@ -1,16 +1,23 @@
-// src/lib/monetization.ts
 import { addGems } from "./supabase";
 
+// === STRIPE PAYMENT LINKS ===
+// Substitua cada placeholder pelo seu link de pagamento do Stripe.
+// No Stripe Dashboard: Products → Create product → Payment Link
+// Para cada link, configure o "After payment" redirect URL para a URL de ativação correspondente.
 export const STRIPE_LINKS = {
   TEMPTATION_OFFER: "SEU_LINK_STRIPE_2.99",
   FIRST_GAME_OVER: "SEU_LINK_STRIPE_0.99",
-  SHIELD_PERM: "SEU_LINK_STRIPE_4.99",
   GEMS_100: "SEU_LINK_STRIPE_GEMS_100",
   GEMS_600: "SEU_LINK_STRIPE_GEMS_600",
   GEMS_1500: "SEU_LINK_STRIPE_GEMS_1500",
+  GEMS_5000: "SEU_LINK_STRIPE_GEMS_5000",
+  SHIELD_PERM: "SEU_LINK_STRIPE_SHIELD_PERM",
   MYSTERY_BOX_UNLOCK: "SEU_LINK_STRIPE_SKIP_TIMER",
 };
 
+// === ACTIVATION CODES ===
+// Estes códigos vão na URL: https://orbrush.fun/?activate=CODIGO
+// Configure cada um como "After payment" redirect URL no Stripe.
 export const ACTIVATION_CODES = {
   TEMPTATION: "temptation_2x",
   FIRST_OFFER: "first_offer_2x",
@@ -18,38 +25,88 @@ export const ACTIVATION_CODES = {
   ADD_100: "add_gems_100",
   ADD_600: "add_gems_600",
   ADD_1500: "add_gems_1500",
+  ADD_5000: "add_gems_5000",
+  GEMS_600_CHEST: "gems_600_chest",
+  GEMS_1500_CHEST_SHIELD: "gems_1500_chest_shield",
+  GEMS_5000_MYTHIC: "gems_5000_mythic",
 };
 
-export function checkMonetizationActivation() {
+// Gera a URL de ativação para um código (para configurar no Stripe)
+export function getActivationUrl(code: string): string {
+  const baseUrl = window.location.origin;
+  return `${baseUrl}/?activate=${code}`;
+}
+
+// Processa códigos de ativação na URL. NÃO limpa a URL (checkUrlActivation faz isso).
+export function checkMonetizationActivation(): string | null {
   const params = new URLSearchParams(window.location.search);
   const code = params.get("activate");
   if (!code) return null;
 
-  // Ativações Permanentes
+  // 2x pontos para sempre (temptation offer + first game over offer)
   if (code === ACTIVATION_CODES.TEMPTATION || code === ACTIVATION_CODES.FIRST_OFFER) {
     localStorage.setItem("orbrush_2x_points", "true");
-    cleanUrl();
     return "2x_points";
   }
+
+  // Shield permanente
   if (code === ACTIVATION_CODES.SHIELD_PERM) {
     localStorage.setItem("orbrush_perm_shield", "true");
-    cleanUrl();
     return "perm_shield";
   }
 
-  // Entrega de Gemas
-  if (code === ACTIVATION_CODES.ADD_100) { addGems(100); cleanUrl(); return "gems_100"; }
-  if (code === ACTIVATION_CODES.ADD_600) { addGems(600); cleanUrl(); return "gems_600"; }
-  if (code === ACTIVATION_CODES.ADD_1500) { addGems(1500); cleanUrl(); return "gems_1500"; }
+  // Pacotes de gemas simples
+  if (code === ACTIVATION_CODES.ADD_100) { addGems(100); return "gems_100"; }
+  if (code === ACTIVATION_CODES.ADD_600) { addGems(600); return "gems_600"; }
+  if (code === ACTIVATION_CODES.ADD_1500) { addGems(1500); return "gems_1500"; }
+  if (code === ACTIVATION_CODES.ADD_5000) { addGems(5000); return "gems_5000"; }
+
+  // Bundles com baús
+  if (code === ACTIVATION_CODES.GEMS_600_CHEST) {
+    addGems(600);
+    addPendingChest("legendary", 1);
+    return "gems_600_chest";
+  }
+  if (code === ACTIVATION_CODES.GEMS_1500_CHEST_SHIELD) {
+    addGems(1500);
+    addPendingChest("legendary", 3);
+    localStorage.setItem("orbrush_perm_shield", "true");
+    return "gems_1500_chest_shield";
+  }
+  if (code === ACTIVATION_CODES.GEMS_5000_MYTHIC) {
+    addGems(5000);
+    addPendingChest("mythic", 1);
+    return "gems_5000_mythic";
+  }
 
   return null;
 }
 
-function cleanUrl() {
-  const url = new URL(window.location.href);
-  url.searchParams.delete("activate");
-  window.history.replaceState({}, "", url.toString());
+function addPendingChest(rarity: "legendary" | "mythic", count: number) {
+  const key = `orbrush_pending_${rarity}_chests`;
+  const current = parseInt(localStorage.getItem(key) || "0", 10);
+  localStorage.setItem(key, String(current + count));
 }
 
-export function hasDoublePoints() { return localStorage.getItem("orbrush_2x_points") === "true"; }
-export function hasPermanentShield() { return localStorage.getItem("orbrush_perm_shield") === "true"; }
+export function getPendingChests(): { legendary: number; mythic: number } {
+  return {
+    legendary: parseInt(localStorage.getItem("orbrush_pending_legendary_chests") || "0", 10),
+    mythic: parseInt(localStorage.getItem("orbrush_pending_mythic_chests") || "0", 10),
+  };
+}
+
+export function consumePendingChest(rarity: "legendary" | "mythic"): boolean {
+  const key = `orbrush_pending_${rarity}_chests`;
+  const current = parseInt(localStorage.getItem(key) || "0", 10);
+  if (current <= 0) return false;
+  localStorage.setItem(key, String(current - 1));
+  return true;
+}
+
+export function hasDoublePoints(): boolean {
+  return localStorage.getItem("orbrush_2x_points") === "true";
+}
+
+export function hasPermanentShield(): boolean {
+  return localStorage.getItem("orbrush_perm_shield") === "true";
+}
