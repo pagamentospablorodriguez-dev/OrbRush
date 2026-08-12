@@ -4,12 +4,11 @@ let droneNodes: { osc: OscillatorNode; gain: GainNode }[] = [];
 
 function getCtx(): AudioContext | null {
   if (muted) return null;
-  if (!ctx) {
-    ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-  }
+  if (!ctx) return null;
   if (ctx.state === "suspended") ctx.resume();
   return ctx;
 }
+
 
 export function setMuted(m: boolean) {
   muted = m;
