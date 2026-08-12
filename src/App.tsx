@@ -23,7 +23,8 @@ import { POWER_UPS } from "@/lib/shop";
 import { getCollectionEntries, getCollectionStats, type CollectionEntry } from "@/lib/collection";
 import { rollSocialNotification, randomSocialDelay, type SocialNotification } from "@/lib/social";
 import { getLossChaseBonus, type LossChaseBonus } from "@/lib/lossChase";
-import { isPremium, checkUrlActivation } from "@/lib/premium";
+import { isPremium, checkUrlActivation, hasPermanentShield } from "@/lib/premium";
+import { getPendingChests } from "@/lib/monetization";
 import { getLives, consumeLife, getSecondsToNextLife, MAX_LIVES } from "@/lib/lives";
 import { PaywallModal } from "@/components/PaywallModal";
 import { ContinueOfferModal } from "@/components/ContinueOfferModal";
@@ -119,6 +120,8 @@ function App() {
   const [showTemptation, setShowTemptation] = useState(false);
   const [showFirstOffer, setShowFirstOffer] = useState(false);
   const [gachaPity, setGachaPity] = useState(0);
+  const [activationToast, setActivationToast] = useState<string | null>(null);
+  const [pendingChestsCount, setPendingChestsCount] = useState(0);
 
   const shakeTimerRef = useRef<number | null>(null);
   const flashTimerRef = useRef<number | null>(null);
@@ -155,6 +158,24 @@ function App() {
     onBurst: burst, onFloatText: floatText, onShockwave: shockwave,
     onAchievement, onScreenShake, onFlash, onQuestProgress, onCollectionNew,
   });
+
+  // Global audio unlock — iOS requires audio to be unlocked on first touch/click anywhere
+  useEffect(() => {
+    const unlock = () => {
+      unlockAudio();
+      document.removeEventListener("touchstart", unlock);
+      document.removeEventListener("touchend", unlock);
+      document.removeEventListener("click", unlock);
+    };
+    document.addEventListener("touchstart", unlock);
+    document.addEventListener("touchend", unlock);
+    document.addEventListener("click", unlock);
+    return () => {
+      document.removeEventListener("touchstart", unlock);
+      document.removeEventListener("touchend", unlock);
+      document.removeEventListener("click", unlock);
+    };
+  }, []);
 
   useEffect(() => {
     if (game.gameState === "idle") return;
@@ -318,9 +339,28 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const activated = checkUrlActivation();
-    if (activated) {
-      setPremiumState(true);
+    const activationResult = checkUrlActivation();
+    if (activationResult) {
+      if (activationResult === "premium") setPremiumState(true);
+      const messages: Record<string, string> = {
+        "premium": "Premium activated!",
+        "2x_points": "2x Points activated!",
+        "perm_shield": "Permanent Shield activated!",
+        "gems_100": "100 gems added!",
+        "gems_600": "600 gems + Chest added!",
+        "gems_600_chest": "600 gems + Chest added!",
+        "gems_1500": "1500 gems + Chests added!",
+        "gems_1500_chest_shield": "1500 gems + Chests + Shield added!",
+        "gems_5000": "5000 gems + Mythic Chest added!",
+        "gems_5000_mythic": "5000 gems + Mythic Chest added!",
+        "skip_timer": "Skip timer activated!",
+        "add_gems_100": "100 gems added!",
+        "add_gems_600": "600 gems added!",
+        "add_gems_1500": "1500 gems added!",
+        "add_gems_5000": "5000 gems added!",
+      };
+      setActivationToast(messages[activationResult] || "Purchase activated!");
+      setTimeout(() => setActivationToast(null), 4500);
     }
 
     checkReferral();
@@ -333,6 +373,9 @@ function App() {
     setRivalBeatenCount(getRivalBeatenCount());
 
     (async () => {
+      if (activationResult) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
       const stats = await loadStats();
       if (stats) {
         game.setHighScore(stats.high_score);
@@ -360,6 +403,9 @@ function App() {
       } else {
         setLeaderboardEntries(generateLeaderboard(0, seed));
       }
+      const pending = getPendingChests();
+      setPendingChestsCount(pending.legendary + pending.mythic);
+
       const streakResult = await updateDailyStreak();
       if (streakResult) {
         game.setDailyStreak(streakResult.streak);
@@ -413,7 +459,11 @@ function App() {
     setLossChase({ active: false, multiplier: 1, secondsLeft: 0, reason: "" });
     setShowContinueOffer(false);
     setShowDoubleOrNothing(false);
-    game.startGame(activePowerUps);
+    const powerUpsToUse = { ...activePowerUps };
+    if (hasPermanentShield()) {
+      powerUpsToUse.shield = true;
+    }
+    game.startGame(powerUpsToUse);
   };
 
   const handleGoHome = () => {
@@ -481,7 +531,11 @@ function App() {
     if (count > 0) { setGems((g) => g + claimed); refreshQuests(); }
   };
 
-  const closeModal = () => { setModal(null); setChestReward(null); setWheelResult(null); setBuyError(null); setChestTeaseIndex(-1); };
+  const closeModal = () => {
+    setModal(null); setChestReward(null); setWheelResult(null); setBuyError(null); setChestTeaseIndex(-1);
+    const pending = getPendingChests();
+    setPendingChestsCount(pending.legendary + pending.mythic);
+  };
 
   const handlePaywallActivated = () => {
     setPremiumState(true);
@@ -515,13 +569,17 @@ function App() {
     setPendingInviteGems(0);
   };
 
-  const handleGachaPull = (orb: GachaOrb, newPity: number) => {
-    setGems(prevGems => {
-      const updatedGems = prevGems - 100;
-      saveStats({ gems: updatedGems, gacha_pity: newPity });
-      return updatedGems;
+  const handleGemsChange = useCallback((delta: number) => {
+    setGems(prev => {
+      const newGems = prev + delta;
+      saveStats({ gems: newGems });
+      return newGems;
     });
+  }, []);
+
+  const handleGachaPull = (orb: GachaOrb, newPity: number) => {
     setGachaPity(newPity);
+    saveStats({ gacha_pity: newPity });
   };
 
   const shakeStyle = shake > 0 ? { animation: `shake 300ms ease-out` } : undefined;
@@ -566,6 +624,13 @@ function App() {
 
       <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none z-30" />
       {flash && <div className="absolute inset-0 z-40 pointer-events-none" style={{ background: flash }} />}
+
+      {/* Activation toast */}
+      {activationToast && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[200] px-6 py-3 rounded-2xl bg-emerald-500/90 border-2 border-emerald-400 text-white font-black text-sm shadow-2xl" style={{ animation: "slideDownFade 4.5s ease-in-out forwards" }}>
+          <span className="flex items-center gap-2"><CheckCircle2 className="w-5 h-5" /> {activationToast}</span>
+        </div>
+      )}
 
       {game.frenzy && <div className="absolute inset-0 z-0 pointer-events-none" style={{ animation: "frenzyBg 0.8s ease-in-out infinite" }} />}
       {game.comebackActive && <div className="absolute inset-0 z-0 pointer-events-none" style={{ animation: "comebackBg 0.6s ease-in-out infinite" }} />}
@@ -617,7 +682,6 @@ function App() {
         {game.gameState === "idle" && (
           <div className="absolute inset-0 flex flex-col items-center justify-center z-20 overflow-y-auto py-4 px-4" style={{ animation: "fadeIn 400ms ease-out", WebkitOverflowScrolling: "touch" }}>
             <div className="text-center w-full max-w-lg mx-auto flex flex-col items-center">
-              {/* Streak FOMO warning */}
               {showStreakWarning && game.dailyStreak >= 2 && (
                 <div className="mb-2 inline-flex items-center gap-2 px-3 sm:px-4 py-1.5 rounded-full bg-orange-500/15 border border-orange-400/40 text-orange-300 text-xs font-bold" style={{ animation: "streakWarningPulse 1.5s ease-in-out infinite" }}>
                   <AlertTriangle className="w-4 h-4 flex-shrink-0" />
@@ -632,19 +696,22 @@ function App() {
                   <span className="text-xs font-black text-white tabular-nums">{gems.toLocaleString()}</span>
                   <button
                     onClick={() => setModal("gemShop")}
-                    className="ml-1 w-5 h-5 bg-emerald-500 hover:bg-emerald-400 rounded-full flex items-center justify-center text-slate-950 font-black shadow-lg transition-transform active:scale-90"
+                    className="ml-1 w-5 h-5 bg-emerald-500 hover:bg-emerald-400 rounded-full flex items-center justify-center text-slate-950 font-black shadow-lg transition-transform active:scale-90 relative"
                   >
                     <span className="mt-[-2px]">+</span>
+                    {pendingChestsCount > 0 && (
+                      <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-amber-400 border border-slate-900 flex items-center justify-center" style={{ animation: "pulseGlow 1s ease-in-out infinite" }}>
+                        <span className="text-[8px] font-black text-slate-950">{pendingChestsCount}</span>
+                      </span>
+                    )}
                   </button>
                 </div>
               </div>
 
-              {/* LOGO — no float animation to prevent layout trembling */}
-              <img src="/Bune_Home.png" alt="OrbRush" className="w-16 h-16 sm:w-20 sm:h-20 mb-1 object-contain drop-shadow-[0_0_15px_rgba(34,211,238,0.3)]" />
+              <img src="/Bune_Logo.png" alt="OrbRush" className="w-16 h-16 sm:w-20 sm:h-20 mb-1 object-contain drop-shadow-[0_0_15px_rgba(34,211,238,0.3)]" />
 
               <h1 className="text-xl sm:text-3xl font-black text-white mb-2 tracking-tight">ORBRUSH<span className="text-cyan-400">.FUN</span></h1>
 
-              {/* Lives indicator (non-premium) */}
               {!premium && (
                 <div className="mb-2 inline-flex items-center gap-2 px-3 sm:px-4 py-1.5 rounded-full bg-rose-500/15 border border-rose-400/30">
                   <div className="flex items-center gap-1">
@@ -663,7 +730,6 @@ function App() {
                 </div>
               )}
 
-              {/* Badges */}
               <div className="flex flex-wrap items-center justify-center gap-1.5 mb-2">
                 {game.prestige > 0 && (
                   <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-500/15 border border-amber-400/30 text-amber-300 text-xs font-bold">
@@ -682,7 +748,6 @@ function App() {
                 )}
               </div>
 
-              {/* Active power-ups */}
               {activePowerUpCount > 0 && (
                 <div className="mb-2 flex items-center justify-center gap-1 flex-wrap">
                   {activePowerUps.shield && <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/20 border border-blue-400/40 text-blue-300 font-bold">🛡️</span>}
@@ -693,19 +758,16 @@ function App() {
                 </div>
               )}
 
-              {/* PLAY button — big, glowing, most prominent */}
               <button onClick={handleStartGame} className="relative px-12 sm:px-14 py-3.5 sm:py-4 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-black text-lg sm:text-2xl transition-transform hover:scale-105 active:scale-95 mt-1" style={{ animation: "playGlow 2s ease-in-out infinite" }}>
                 <span className="flex items-center gap-3"><Play className="w-5 h-5 sm:w-6 sm:h-6" fill="white" />{!premium && lives <= 0 ? "GET LIVES" : "PLAY"}</span>
               </button>
 
-              {/* Low gems prompt */}
               {gems < 100 && (
                 <div className="mt-1.5 text-amber-400/70 text-[10px] font-bold" style={{ animation: "lowGemsPulse 2s ease-in-out infinite" }}>
                   Low on gems? Tap + to get more!
                 </div>
               )}
 
-              {/* Meta-game buttons — compact grid */}
               <div className="mt-3 flex items-center justify-center gap-1 sm:gap-1.5 flex-wrap">
                 <button onClick={() => setModal("chest")} className="flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-lg bg-amber-500/15 border border-amber-400/30 text-amber-300 font-bold text-[11px] sm:text-xs hover:bg-amber-500/25 transition-colors">
                   <Gift className="w-3.5 h-3.5" /> Chest
@@ -735,7 +797,6 @@ function App() {
                 </button>
               </div>
 
-              {/* Monetization buttons — compact, enticing */}
               <div className="grid grid-cols-3 gap-1.5 sm:gap-2 mt-2 w-full max-w-xs">
                 <button onClick={() => setModal("gacha")} className="relative py-2 sm:py-2.5 bg-gradient-to-br from-purple-600/40 to-purple-800/40 hover:from-purple-600/60 hover:to-purple-800/60 text-purple-200 font-bold rounded-xl border border-purple-500/40 transition-all flex flex-col items-center gap-0.5 hover:scale-105 active:scale-95">
                   <Swords className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -754,7 +815,6 @@ function App() {
                 </button>
               </div>
 
-              {/* Challenge */}
               {game.challengeTarget > 0 && !game.challengeDone && (
                 <div className="mt-3 flex items-center justify-center gap-2 px-3 sm:px-4 py-2 rounded-xl bg-green-500/10 border border-green-400/30">
                   <Target className="w-4 h-4 text-green-400 flex-shrink-0" />
@@ -770,7 +830,6 @@ function App() {
                 </div>
               )}
 
-              {/* Stats grid */}
               {loadedStats && (
                 <div className="grid grid-cols-4 gap-1.5 sm:gap-2 mt-3">
                   <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-2">
@@ -796,7 +855,6 @@ function App() {
                 </div>
               )}
 
-              {/* Orb legend — collapsible, compact */}
               <details className="mt-3 text-left">
                 <summary className="text-slate-500 text-[10px] font-bold cursor-pointer hover:text-slate-400 select-none">Orb Guide</summary>
                 <div className="mt-1.5 flex flex-wrap gap-1 justify-center">
@@ -959,7 +1017,14 @@ function App() {
                 <div className="flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-full bg-fuchsia-500/10 border border-fuchsia-400/30">
                   <Gem className="w-3 h-3 text-fuchsia-300" />
                   <span className="text-xs text-fuchsia-300 font-black tabular-nums">{gems}</span>
-                  <button onClick={() => setModal("gemShop")} className="ml-1 w-4 h-4 bg-fuchsia-500 rounded-full flex items-center justify-center text-slate-950 text-[10px] font-black">+</button>
+                  <button onClick={() => setModal("gemShop")} className="ml-1 w-4 h-4 bg-fuchsia-500 rounded-full flex items-center justify-center text-slate-950 text-[10px] font-black relative">
+                    +
+                    {pendingChestsCount > 0 && (
+                      <span className="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 rounded-full bg-amber-400 border border-slate-900 flex items-center justify-center" style={{ animation: "pulseGlow 1s ease-in-out infinite" }}>
+                        <span className="text-[7px] font-black text-slate-950">{pendingChestsCount}</span>
+                      </span>
+                    )}
+                  </button>
                 </div>
               )}
               {squeezeReady && (
@@ -1169,15 +1234,7 @@ function App() {
                           legendary: "bg-amber-500", mythic: "bg-rose-500",
                         };
                         return (
-                          <div
-                            key={i}
-                            className={`w-3 h-3 rounded-full transition-all ${
-                              i === chestTeaseIndex
-                                ? `${colors[r]} scale-150 shadow-lg`
-                                : "bg-slate-700"
-                            }`}
-                            style={i === chestTeaseIndex ? { animation: "scoreBump 150ms ease-out" } : undefined}
-                          />
+                          <div key={i} className={`w-3 h-3 rounded-full transition-all ${i === chestTeaseIndex ? `${colors[r]} scale-150 shadow-lg` : "bg-slate-700"}`} style={i === chestTeaseIndex ? { animation: "scoreBump 150ms ease-out" } : undefined} />
                         );
                       })}
                     </div>
@@ -1320,12 +1377,12 @@ function App() {
             {modal === "invite" && (
               <InviteModal open={true} onClose={closeModal} onRewardsClaimed={handleInviteRewardsClaimed} />
             )}
-            {modal === "gacha" && <GachaModal open={true} onClose={closeModal} gems={gems} pity={gachaPity} onPull={handleGachaPull} />}
-            {modal === "mystery" && <MysteryBoxModal open={true} onClose={closeModal} />}
-            {modal === "tiered" && <TieredChestsModal open={true} onClose={closeModal} gems={gems} />}
+            {modal === "gacha" && <GachaModal open={true} onClose={closeModal} gems={gems} pity={gachaPity} onGemsChange={handleGemsChange} onPull={handleGachaPull} />}
+            {modal === "mystery" && <MysteryBoxModal open={true} onClose={closeModal} gems={gems} onGemsChange={handleGemsChange} />}
+            {modal === "tiered" && <TieredChestsModal open={true} onClose={closeModal} gems={gems} onGemsChange={handleGemsChange} />}
             {showTemptation && <TemptationOfferModal open={true} onClose={() => setShowTemptation(false)} />}
             {showFirstOffer && <FirstGameOverOfferModal open={true} onClose={() => setShowFirstOffer(false)} />}
-            {modal === "gemShop" && <ShopModal open={true} onClose={closeModal} />}
+            {modal === "gemShop" && <ShopModal open={true} onClose={closeModal} onGemsChange={handleGemsChange} />}
 
           </div>
         </div>
