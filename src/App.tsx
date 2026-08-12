@@ -109,19 +109,16 @@ function App() {
   const [showDoubleOrNothing, setShowDoubleOrNothing] = useState(false);
   const [doubleOrNothingGems, setDoubleOrNothingGems] = useState(0);
   const [lastSavedGameGems, setLastSavedGameGems] = useState(0);
-  // NEW: Login reward state
   const [showLoginReward, setShowLoginReward] = useState(false);
   const [loginRewardDay, setLoginRewardDay] = useState(1);
   const [loginRewardStreakBroken, setLoginRewardStreakBroken] = useState(false);
-  // NEW: Squeeze state
   const [squeezeState, setSqueezeState] = useState<string>("dry");
   const [squeezeReady, setSqueezeReady] = useState(false);
   const squeezeStateRef = useRef<string>("dry");
-  // NEW: Invite pending rewards badge
   const [pendingInviteGems, setPendingInviteGems] = useState(0);
   const [showTemptation, setShowTemptation] = useState(false);
-const [showFirstOffer, setShowFirstOffer] = useState(false);
-const [gachaPity, setGachaPity] = useState(0);
+  const [showFirstOffer, setShowFirstOffer] = useState(false);
+  const [gachaPity, setGachaPity] = useState(0);
 
   const shakeTimerRef = useRef<number | null>(null);
   const flashTimerRef = useRef<number | null>(null);
@@ -159,7 +156,6 @@ const [gachaPity, setGachaPity] = useState(0);
     onAchievement, onScreenShake, onFlash, onQuestProgress, onCollectionNew,
   });
 
-  // Social proof notifications — fake players achieving things
   useEffect(() => {
     if (game.gameState === "idle") return;
     let timer: number;
@@ -178,7 +174,6 @@ const [gachaPity, setGachaPity] = useState(0);
     return () => clearTimeout(timer);
   }, [game.gameState]);
 
-  // Streak FOMO warning — show when idle and has a streak to lose
   useEffect(() => {
     if (game.gameState === "idle" && game.dailyStreak >= 2 && !showStreakWarning) {
       const timer = setTimeout(() => setShowStreakWarning(true), 2000);
@@ -187,7 +182,6 @@ const [gachaPity, setGachaPity] = useState(0);
     if (game.gameState === "playing") setShowStreakWarning(false);
   }, [game.gameState, game.dailyStreak, showStreakWarning]);
 
-  // Loss-chase bonus after game over
   useEffect(() => {
     if (game.gameState === "gameover") {
       const bonus = getLossChaseBonus(game.sessionStreak, game.nearRecord, game.newRecord);
@@ -209,12 +203,11 @@ const [gachaPity, setGachaPity] = useState(0);
     }
   }, [game.gameState, game.sessionStreak, game.nearRecord, game.newRecord]);
 
-  // Game over save
   useEffect(() => {
     if (game.gameState === "gameover") {
       const is2x = hasDoublePoints();
-const finalScore = is2x ? game.score * 2 : game.score;
-const newHigh = Math.max(game.highScore, finalScore);
+      const finalScore = is2x ? game.score * 2 : game.score;
+      const newHigh = Math.max(game.highScore, finalScore);
 
       const newBestCombo = Math.max(loadedStats?.bestCombo ?? 0, game.bestCombo);
       const gemsEarned = game.gems;
@@ -240,7 +233,6 @@ const newHigh = Math.max(game.highScore, finalScore);
       } : prev);
       if (game.score > (loadedStats?.high ?? 0)) game.setHighScore(game.score);
 
-      // Check if player beat their rival
       if (game.score > 0 && game.highScore > 0) {
         const board = generateLeaderboard(game.highScore, rivalSeed);
         const rival = board.find((e) => e.isRival);
@@ -255,11 +247,9 @@ const newHigh = Math.max(game.highScore, finalScore);
         }
       }
 
-      // Update leaderboard with new high score
       const finalHigh = Math.max(game.highScore, game.score);
       setLeaderboardEntries(generateLeaderboard(finalHigh, rivalSeed));
 
-      // NEW: Record game for squeeze system
       recordGamePlayedSqueeze().then((result) => {
         setSqueezeState(result.newState);
         squeezeStateRef.current = result.newState;
@@ -271,7 +261,6 @@ const newHigh = Math.max(game.highScore, finalScore);
       setPowerUps({ shield: false, extra_life: false, frenzy: false, double: false, freeze: false });
       refreshQuests();
 
-      // Offer double or nothing if gems were earned
       if (gemsEarned > 0) {
         setTimeout(() => {
           setDoubleOrNothingGems(gemsEarned);
@@ -279,7 +268,6 @@ const newHigh = Math.max(game.highScore, finalScore);
         }, 800);
       }
 
-      // Show continue offer for non-premium players when out of lives
       if (!premium) {
         const currentLives = getLives();
         if (currentLives <= 0) {
@@ -289,12 +277,10 @@ const newHigh = Math.max(game.highScore, finalScore);
         }
       }
 
-      // Oferta de Pico de Dopamina (Jackpot ou Recorde) — so no game over
       if (game.newRecord || game.totalJackpots > 0) {
         setTimeout(() => setShowTemptation(true), 800);
       }
 
-      // Oferta de Primeiro Game Over — so na primeira vez
       if (!loadedStats?.firstOffered) {
         setTimeout(() => {
           setShowFirstOffer(true);
@@ -307,7 +293,6 @@ const newHigh = Math.max(game.highScore, finalScore);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game.gameState]);
 
-  // Challenge progress
   useEffect(() => {
     if (game.gameState === "playing" && game.score > 0 && game.challengeTarget > 0 && !game.challengeDone) {
       const t = setTimeout(() => updateChallengeProgress(game.score), 1000);
@@ -316,7 +301,6 @@ const newHigh = Math.max(game.highScore, finalScore);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game.score]);
 
-  // Lives recharge countdown
   useEffect(() => {
     const updateLives = () => {
       const currentLives = getLives();
@@ -333,22 +317,17 @@ const newHigh = Math.max(game.highScore, finalScore);
     if (stats) { setQuests(parseQuests(stats)); setGems(stats.gems ?? 0); }
   }, []);
 
-  // Initial load
   useEffect(() => {
-    // Check URL for activation code first
     const activated = checkUrlActivation();
     if (activated) {
       setPremiumState(true);
     }
 
-    // NEW: Check for referral code in URL
     checkReferral();
 
-    // Load lives
     setLives(getLives());
     setLivesCountdown(getSecondsToNextLife());
 
-    // Load rival seed
     const seed = getRivalSeed();
     setRivalSeedState(seed);
     setRivalBeatenCount(getRivalBeatenCount());
@@ -375,13 +354,10 @@ const newHigh = Math.max(game.highScore, finalScore);
           frenzy: stats.power_frenzy, double: stats.power_double, freeze: stats.power_freeze,
         });
         setQuests(parseQuests(stats));
-        // Generate initial leaderboard based on loaded high score
         setLeaderboardEntries(generateLeaderboard(stats.high_score, seed));
-        // NEW: Load squeeze state
         setSqueezeState(stats.squeeze_state ?? "dry");
         squeezeStateRef.current = stats.squeeze_state ?? "dry";
       } else {
-        // New player — generate leaderboard with 0 high score
         setLeaderboardEntries(generateLeaderboard(0, seed));
       }
       const streakResult = await updateDailyStreak();
@@ -404,7 +380,6 @@ const newHigh = Math.max(game.highScore, finalScore);
       setCollectionEntries(getCollectionEntries());
       setCollectionStats(getCollectionStats());
 
-      // NEW: Check for login reward
       const loginCheck = await checkLoginReward();
       if (loginCheck && loginCheck.available) {
         setLoginRewardDay(loginCheck.day);
@@ -423,7 +398,6 @@ const newHigh = Math.max(game.highScore, finalScore);
   };
 
   const handleStartGame = () => {
-    // Block if no lives (non-premium)
     if (!premium) {
       const currentLives = getLives();
       if (currentLives <= 0) {
@@ -440,18 +414,11 @@ const newHigh = Math.max(game.highScore, finalScore);
     game.startGame(activePowerUps);
   };
 
-  // NEW: Go to home from game over
   const handleGoHome = () => {
     game.setHighScore(game.highScore);
-    // Force idle state by starting then immediately ending — but we can't do that cleanly.
-    // Instead, we use a simple approach: reload the page to get back to idle.
-    // Actually, the game hook doesn't expose a "goHome" function, so we use a workaround:
-    // We set the game state to idle by calling a simple page-level state reset.
-    // The cleanest way without touching useGame.ts is to reload.
     window.location.reload();
   };
 
-  // Chest with near-miss tease animation
   const handleOpenChest = () => {
     setChestOpening(true);
     setChestReward(null);
@@ -467,8 +434,6 @@ const newHigh = Math.max(game.highScore, finalScore);
         setChestOpening(false);
         setChestReward(reward);
         setGems((g) => g + reward.gems);
-        // Near-miss sound: legendary/mythic get the triumphant reveal,
-        // everything below gets the "quase!" near-miss sound
         if (reward.rarity === "legendary" || reward.rarity === "mythic") {
           playChestReveal();
         } else {
@@ -525,8 +490,6 @@ const newHigh = Math.max(game.highScore, finalScore);
   };
 
   const handleDoubleOrNothingCollect = (finalGems: number) => {
-    // Adjust saved gems: we already saved the original earned gems in the game over effect.
-    // The difference between finalGems and lastSavedGameGems needs to be persisted.
     const diff = finalGems - lastSavedGameGems;
     if (diff !== 0) {
       addGems(diff);
@@ -536,7 +499,6 @@ const newHigh = Math.max(game.highScore, finalScore);
     setShowDoubleOrNothing(false);
   };
 
-  // NEW: Handle login reward claim
   const handleClaimLoginReward = async () => {
     const result = await claimLoginReward();
     if (result) {
@@ -545,20 +507,20 @@ const newHigh = Math.max(game.highScore, finalScore);
     }
   };
 
-  // NEW: Handle invite rewards claimed
   const handleInviteRewardsClaimed = (claimedGems: number) => {
     setGems((g) => g + claimedGems);
     setLoadedStats((prev) => prev ? { ...prev, gems: (prev.gems ?? 0) + claimedGems } : prev);
     setPendingInviteGems(0);
   };
+
   const handleGachaPull = (orb: GachaOrb, newPity: number) => {
-  setGems(prevGems => {
-    const updatedGems = prevGems - 100;
-    saveStats({ gems: updatedGems, gacha_pity: newPity });
-    return updatedGems;
-  });
-  setGachaPity(newPity);
-};
+    setGems(prevGems => {
+      const updatedGems = prevGems - 100;
+      saveStats({ gems: updatedGems, gacha_pity: newPity });
+      return updatedGems;
+    });
+    setGachaPity(newPity);
+  };
 
   const shakeStyle = shake > 0 ? { animation: `shake 300ms ease-out` } : undefined;
   const activePowerUpCount = Object.values(activePowerUps).filter(Boolean).length;
@@ -596,6 +558,13 @@ const newHigh = Math.max(game.highScore, finalScore);
         @keyframes lossChaseGlow { 0%,100%{box-shadow:0 0 20px 5px rgba(249,115,22,0.4)} 50%{box-shadow:0 0 40px 15px rgba(249,115,22,0.7)} }
         @keyframes streakWarningPulse { 0%,100%{opacity:0.7} 50%{opacity:1} }
         @keyframes collectionPop { 0%{transform:scale(0) rotate(-15deg);opacity:0} 60%{transform:scale(1.2) rotate(5deg);opacity:1} 100%{transform:scale(1) rotate(0);opacity:1} }
+        @keyframes playGlow { 0%,100%{box-shadow:0 0 25px 8px rgba(34,211,238,0.4),0 0 50px 15px rgba(34,211,238,0.2)} 50%{box-shadow:0 0 40px 15px rgba(34,211,238,0.7),0 0 70px 25px rgba(34,211,238,0.3)} }
+        @keyframes logoFloat { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
+        @keyframes shimmer { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
+        @keyframes ctaPulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.03)} }
+        @keyframes gemPop { 0%{transform:scale(0) rotate(-180deg);opacity:0} 60%{transform:scale(1.2) rotate(10deg);opacity:1} 100%{transform:scale(1) rotate(0);opacity:1} }
+        @keyframes lowGemsPulse { 0%,100%{opacity:0.6} 50%{opacity:1} }
+        @keyframes glowBorder { 0%,100%{border-color:rgba(251,191,36,0.3)} 50%{border-color:rgba(251,191,36,0.6)} }
       `}</style>
 
       <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none z-30" />
@@ -649,31 +618,35 @@ const newHigh = Math.max(game.highScore, finalScore);
 
         {/* IDLE / START SCREEN */}
         {game.gameState === "idle" && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center z-20 overflow-y-auto py-8 px-4">
+          <div className="absolute inset-0 flex flex-col items-center justify-center z-20 overflow-y-auto py-6 px-4">
             <div className="text-center w-full max-w-lg mx-auto" style={{ animation: "slideUp 600ms ease-out" }}>
               {/* Streak FOMO warning */}
               {showStreakWarning && game.dailyStreak >= 2 && (
-                <div className="mb-4 inline-flex items-center gap-2 px-3 sm:px-4 py-2 rounded-full bg-orange-500/15 border border-orange-400/40 text-orange-300 text-xs sm:text-sm font-bold" style={{ animation: "streakWarningPulse 1.5s ease-in-out infinite" }}>
+                <div className="mb-3 inline-flex items-center gap-2 px-3 sm:px-4 py-2 rounded-full bg-orange-500/15 border border-orange-400/40 text-orange-300 text-xs sm:text-sm font-bold" style={{ animation: "streakWarningPulse 1.5s ease-in-out infinite" }}>
                   <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-                  You're on a {game.dailyStreak}-day streak! Don't lose it!
+                  {game.dailyStreak}-day streak! Don't lose it!
                 </div>
               )}
 
-              {/* GEMS COUNTER + SHOP BUTTON */}
-<div className="absolute top-4 right-4 z-50">
-  <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900/80 backdrop-blur-md border border-slate-700/50 rounded-full shadow-lg">
-    <Gem className="w-3.5 h-3.5 text-emerald-400" fill="currentColor" />
-    <span className="text-xs font-black text-white tabular-nums">{gems}</span>
-    <button 
-      onClick={() => setModal("gemShop")} 
-      className="ml-1 w-5 h-5 bg-emerald-500 hover:bg-emerald-400 rounded-full flex items-center justify-center text-slate-950 font-black shadow-lg transition-transform active:scale-90"
-    >
-      <span className="mt-[-2px]">+</span>
-    </button>
-  </div>
-</div>
+              {/* GEMS COUNTER + SHOP BUTTON — single, top-right */}
+              <div className="absolute top-4 right-4 z-50">
+                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900/80 backdrop-blur-md border border-slate-700/50 rounded-full shadow-lg">
+                  <Gem className="w-3.5 h-3.5 text-emerald-400" fill="currentColor" />
+                  <span className="text-xs font-black text-white tabular-nums">{gems.toLocaleString()}</span>
+                  <button
+                    onClick={() => setModal("gemShop")}
+                    className="ml-1 w-5 h-5 bg-emerald-500 hover:bg-emerald-400 rounded-full flex items-center justify-center text-slate-950 font-black shadow-lg transition-transform active:scale-90"
+                  >
+                    <span className="mt-[-2px]">+</span>
+                  </button>
+                </div>
+              </div>
 
-              
+              {/* LOGO */}
+              <img src="/Bune_Logo.png" alt="OrbRush" className="w-20 h-20 sm:w-24 sm:h-24 mx-auto mb-2 object-contain" style={{ animation: "logoFloat 3s ease-in-out infinite" }} />
+
+              <h1 className="text-2xl sm:text-4xl font-black text-white mb-3 tracking-tight">ORBRUSH<span className="text-cyan-400">.FUN</span></h1>
+
               {/* Lives indicator (non-premium) */}
               {!premium && (
                 <div className="mb-3 inline-flex items-center gap-2 px-3 sm:px-4 py-2 rounded-full bg-rose-500/15 border border-rose-400/30">
@@ -693,27 +666,16 @@ const newHigh = Math.max(game.highScore, finalScore);
                 </div>
               )}
 
-              <div className="mb-5 flex justify-center gap-2">
-                {[Star, Zap, Flame, Crown, Shield].map((Icon, i) => (
-                  <div key={i} className="w-11 h-11 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-cyan-500/20 to-blue-600/20 border border-cyan-400/30 flex items-center justify-center" style={{ animation: `orbPulse 1.5s ease-in-out ${i * 0.2}s infinite` }}>
-                    <Icon className="w-5 h-5 sm:w-7 sm:h-7 text-cyan-300" />
-                  </div>
-                ))}
-              </div>
-              <h1 className="text-3xl sm:text-5xl font-black text-white mb-2 tracking-tight">ORBRUSH<span className="text-cyan-400">.FUN</span></h1>
-
-              <div className="flex flex-wrap items-center justify-center gap-1.5 mb-4">
+              {/* Badges — no gems here, that's top-right */}
+              <div className="flex flex-wrap items-center justify-center gap-1.5 mb-3">
                 {game.prestige > 0 && (
                   <div className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-full bg-amber-500/15 border border-amber-400/30 text-amber-300 text-xs sm:text-sm font-bold">
-                    <Crown className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> Prestige {game.prestige} · +{Math.round(game.prestige * 10)}%
+                    <Crown className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> P{game.prestige} · +{Math.round(game.prestige * 10)}%
                   </div>
                 )}
-                <div className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-full bg-fuchsia-500/15 border border-fuchsia-400/30 text-fuchsia-300 text-xs sm:text-sm font-bold">
-                  <Gem className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> {gems.toLocaleString()} gems
-                </div>
                 {game.sessionStreak > 1 && (
                   <div className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-full bg-cyan-500/15 border border-cyan-400/30 text-cyan-300 text-xs sm:text-sm font-bold">
-                    <Flame className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="currentColor" /> Streak: {game.sessionStreak} · {game.sessionMult.toFixed(1)}x
+                    <Flame className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="currentColor" /> {game.sessionStreak}x · {game.sessionMult.toFixed(1)}x
                   </div>
                 )}
                 {collectionStats.discovered > 0 && (
@@ -723,6 +685,7 @@ const newHigh = Math.max(game.highScore, finalScore);
                 )}
               </div>
 
+              {/* Active power-ups */}
               {activePowerUpCount > 0 && (
                 <div className="mb-3 flex items-center justify-center gap-1.5 flex-wrap">
                   {activePowerUps.shield && <span className="text-xs px-2 py-1 rounded-full bg-blue-500/20 border border-blue-400/40 text-blue-300 font-bold">🛡️ Shield</span>}
@@ -734,10 +697,22 @@ const newHigh = Math.max(game.highScore, finalScore);
               )}
 
               <p className="text-slate-400 text-sm sm:text-lg mb-1">Tap the orbs. Build combos. Unlock achievements.</p>
-              <p className="text-slate-500 text-xs sm:text-sm mb-5">How many points can you score before losing all your lives?</p>
+              <p className="text-slate-500 text-xs sm:text-sm mb-4">How many points can you score before losing all your lives?</p>
 
-              {/* Meta-game buttons */}
-              <div className="mb-4 flex items-center justify-center gap-1.5 sm:gap-2 flex-wrap">
+              {/* PLAY button — big, glowing, most prominent */}
+              <button onClick={handleStartGame} className="group relative px-12 sm:px-14 py-4 sm:py-5 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-black text-xl sm:text-2xl transition-transform hover:scale-105 active:scale-95" style={{ animation: "playGlow 2s ease-in-out infinite" }}>
+                <span className="flex items-center gap-3"><Play className="w-6 h-6 sm:w-7 sm:h-7" fill="white" />{!premium && lives <= 0 ? "GET LIVES" : "PLAY"}</span>
+              </button>
+
+              {/* Low gems prompt */}
+              {gems < 100 && (
+                <div className="mt-3 text-amber-400/70 text-xs font-bold" style={{ animation: "lowGemsPulse 2s ease-in-out infinite" }}>
+                  Low on gems? Tap + to get more!
+                </div>
+              )}
+
+              {/* Meta-game buttons — clean grid */}
+              <div className="mt-4 mb-3 flex items-center justify-center gap-1.5 sm:gap-2 flex-wrap">
                 <button onClick={() => setModal("chest")} className="flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl bg-amber-500/15 border border-amber-400/30 text-amber-300 font-bold text-xs sm:text-sm hover:bg-amber-500/25 transition-colors">
                   <Gift className="w-4 h-4" /> Chest
                 </button>
@@ -756,7 +731,6 @@ const newHigh = Math.max(game.highScore, finalScore);
                 <button onClick={() => setModal("leaderboard")} className="flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl bg-amber-500/15 border border-amber-400/30 text-amber-300 font-bold text-xs sm:text-sm hover:bg-amber-500/25 transition-colors">
                   <Trophy className="w-4 h-4" /> Ranks
                 </button>
-                {/* NEW: Invite button */}
                 <button onClick={() => setModal("invite")} className="flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl bg-cyan-500/15 border border-cyan-400/30 text-cyan-300 font-bold text-xs sm:text-sm hover:bg-cyan-500/25 transition-colors relative">
                   <Users className="w-4 h-4" /> Invite
                   {pendingInviteGems > 0 && (
@@ -766,15 +740,29 @@ const newHigh = Math.max(game.highScore, finalScore);
                   )}
                 </button>
               </div>
-              {/* NOVOS BOTÕES DE MONETIZAÇÃO */}
-<div className="grid grid-cols-3 gap-2 mt-3">
-  <button onClick={() => setModal("gacha")} className="py-2.5 bg-purple-900/40 hover:bg-purple-800/50 text-purple-300 font-bold rounded-xl border border-purple-500/30 transition-colors flex flex-col items-center text-[10px]"><Swords className="w-4 h-4 mb-1" /> SUMMON</button>
-  <button onClick={() => setModal("mystery")} className="py-2.5 bg-amber-900/40 hover:bg-amber-800/50 text-amber-300 font-bold rounded-xl border border-amber-500/30 transition-colors flex flex-col items-center text-[10px]"><Timer className="w-4 h-4 mb-1" /> BOX</button>
-  <button onClick={() => setModal("tiered")} className="py-2.5 bg-emerald-900/40 hover:bg-emerald-800/50 text-emerald-300 font-bold rounded-xl border border-emerald-500/30 transition-colors flex flex-col items-center text-[10px]"><Gift className="w-4 h-4 mb-1" /> CHESTS</button>
-</div>
 
+              {/* Monetization buttons — prominent, enticing */}
+              <div className="grid grid-cols-3 gap-2 mb-4">
+                <button onClick={() => setModal("gacha")} className="relative py-3 bg-gradient-to-br from-purple-600/40 to-purple-800/40 hover:from-purple-600/60 hover:to-purple-800/60 text-purple-200 font-bold rounded-xl border border-purple-500/40 transition-all flex flex-col items-center gap-1 hover:scale-105 active:scale-95">
+                  <Swords className="w-5 h-5" />
+                  <span className="text-[10px]">SUMMON</span>
+                  <span className="text-[8px] text-purple-400">100 💎</span>
+                </button>
+                <button onClick={() => setModal("mystery")} className="relative py-3 bg-gradient-to-br from-amber-600/40 to-amber-800/40 hover:from-amber-600/60 hover:to-amber-800/60 text-amber-200 font-bold rounded-xl border border-amber-500/40 transition-all flex flex-col items-center gap-1 hover:scale-105 active:scale-95">
+                  <Timer className="w-5 h-5" />
+                  <span className="text-[10px]">MYSTERY BOX</span>
+                  <span className="text-[8px] text-amber-400">50 💎</span>
+                </button>
+                <button onClick={() => setModal("tiered")} className="relative py-3 bg-gradient-to-br from-emerald-600/40 to-emerald-800/40 hover:from-emerald-600/60 hover:to-emerald-800/60 text-emerald-200 font-bold rounded-xl border border-emerald-500/40 transition-all flex flex-col items-center gap-1 hover:scale-105 active:scale-95">
+                  <Gift className="w-5 h-5" />
+                  <span className="text-[10px]">CHESTS</span>
+                  <span className="text-[8px] text-emerald-400">100+ 💎</span>
+                </button>
+              </div>
+
+              {/* Challenge */}
               {game.challengeTarget > 0 && !game.challengeDone && (
-                <div className="mb-5 flex items-center justify-center gap-3 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl bg-green-500/10 border border-green-400/30">
+                <div className="mb-4 flex items-center justify-center gap-3 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl bg-green-500/10 border border-green-400/30">
                   <Target className="w-5 h-5 text-green-400 flex-shrink-0" />
                   <div className="text-left">
                     <div className="text-green-300 font-bold text-xs sm:text-sm">Daily Challenge</div>
@@ -783,13 +771,14 @@ const newHigh = Math.max(game.highScore, finalScore);
                 </div>
               )}
               {game.challengeDone && (
-                <div className="mb-5 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-green-500/20 border border-green-400/40 text-green-300 font-bold text-xs sm:text-sm">
-                  <Award className="w-4 h-4" /> Today's challenge complete!
+                <div className="mb-4 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-green-500/20 border border-green-400/40 text-green-300 font-bold text-xs sm:text-sm">
+                  <Award className="w-4 h-4" /> Challenge complete!
                 </div>
               )}
 
+              {/* Stats grid */}
               {loadedStats && (
-                <div className="grid grid-cols-4 gap-1.5 sm:gap-2 mb-5">
+                <div className="grid grid-cols-4 gap-1.5 sm:gap-2 mb-4">
                   <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-2 sm:p-2.5">
                     <Trophy className="w-4 h-4 text-amber-400 mx-auto mb-1" />
                     <div className="text-amber-400 font-bold text-base sm:text-lg">{loadedStats.high.toLocaleString()}</div>
@@ -813,11 +802,8 @@ const newHigh = Math.max(game.highScore, finalScore);
                 </div>
               )}
 
-              <button onClick={handleStartGame} className="group relative px-10 sm:px-12 py-3.5 sm:py-4 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold text-lg sm:text-xl shadow-2xl shadow-cyan-500/40 hover:scale-105 active:scale-95 transition-transform">
-                <span className="flex items-center gap-3"><Play className="w-5 h-5 sm:w-6 sm:h-6" fill="white" />{!premium && lives <= 0 ? "GET LIVES" : "PLAY"}</span>
-              </button>
-
-              <div className="mt-5 flex flex-wrap gap-1 justify-center text-[10px] sm:text-[11px] text-slate-500 max-w-md mx-auto">
+              {/* Orb legend */}
+              <div className="flex flex-wrap gap-1 justify-center text-[10px] sm:text-[11px] text-slate-500 max-w-md mx-auto">
                 <span className="flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-full bg-slate-800/50 border border-slate-700"><span className="w-2.5 h-2.5 rounded-full bg-gradient-to-br from-cyan-400 to-blue-500" /> +10</span>
                 <span className="flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-full bg-slate-800/50 border border-slate-700"><Star className="w-2.5 h-2.5 text-amber-400" /> +100</span>
                 <span className="flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-full bg-slate-800/50 border border-slate-700"><Sparkles className="w-2.5 h-2.5 text-fuchsia-400" /> +50</span>
@@ -839,85 +825,85 @@ const newHigh = Math.max(game.highScore, finalScore);
 
         {/* GAME OVER SCREEN */}
         {game.gameState === "gameover" && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center z-20 bg-slate-950/60 backdrop-blur-sm overflow-y-auto py-8 px-4">
+          <div className="absolute inset-0 flex flex-col items-center justify-center z-20 bg-slate-950/60 backdrop-blur-sm overflow-y-auto py-6 px-4">
             <div className="text-center w-full max-w-md mx-auto my-auto" style={{ animation: "slideUp 500ms ease-out" }}>
-              {/* Loss-chase bonus banner */}
               {lossChaseActive && (
-                <div className="mb-4 inline-flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-2xl bg-orange-500/20 border-2 border-orange-400/50 text-orange-300 font-black text-sm sm:text-base" style={{ animation: "lossChaseGlow 1s ease-in-out infinite" }}>
+                <div className="mb-3 inline-flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-2xl bg-orange-500/20 border-2 border-orange-400/50 text-orange-300 font-black text-sm sm:text-base" style={{ animation: "lossChaseGlow 1s ease-in-out infinite" }}>
                   <Timer className="w-5 h-5" />
                   {lossChase.reason} · {lossChase.secondsLeft}s
                 </div>
               )}
               {game.newRecord && game.score > 0 && (
-                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-300 font-bold text-xs sm:text-sm mb-3" style={{ animation: "pulseGlow 1s ease-in-out infinite" }}>
+                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-300 font-bold text-xs sm:text-sm mb-2" style={{ animation: "pulseGlow 1s ease-in-out infinite" }}>
                   <Crown className="w-4 h-4" /> NEW RECORD!
                 </div>
               )}
               {game.prestige > 0 && (loadedStats?.prestige ?? 0) < game.prestige && (
-                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-300 font-bold text-xs sm:text-sm mb-3">
+                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-300 font-bold text-xs sm:text-sm mb-2">
                   <Crown className="w-4 h-4" /> PRESTIGE {game.prestige}! +10% permanent
                 </div>
               )}
-              <h2 className="text-3xl sm:text-4xl font-black text-white mb-2">Game Over</h2>
-              <div className="text-5xl sm:text-6xl font-black text-cyan-400 mb-2" style={{ animation: "scoreBump 600ms ease-out" }}>{game.score.toLocaleString()}</div>
+              <h2 className="text-2xl sm:text-4xl font-black text-white mb-2">Game Over</h2>
+              <div className="text-4xl sm:text-6xl font-black text-cyan-400 mb-2" style={{ animation: "scoreBump 600ms ease-out" }}>{game.score.toLocaleString()}</div>
               {game.gems > 0 && (
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-fuchsia-500/15 border border-fuchsia-400/30 text-fuchsia-300 text-xs sm:text-sm font-bold mb-4">
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-fuchsia-500/15 border border-fuchsia-400/30 text-fuchsia-300 text-xs sm:text-sm font-bold mb-3">
                   <Gem className="w-4 h-4" /> +{game.gems} gems earned!
                 </div>
               )}
               {game.firstWinToday && (
-                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-300 text-xs sm:text-sm font-bold mb-3" style={{ animation: "firstWinPop 500ms ease-out" }}>
-                  <Star className="w-4 h-4" fill="currentColor" /> First win of the day! +100 gems!
+                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-300 text-xs sm:text-sm font-bold mb-2" style={{ animation: "firstWinPop 500ms ease-out" }}>
+                  <Star className="w-4 h-4" fill="currentColor" /> First win! +100 gems!
                 </div>
               )}
               {game.nearRecord && !game.newRecord && (
-                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-orange-500/15 border border-orange-400/40 text-orange-300 text-xs sm:text-sm font-bold mb-3" style={{ animation: "nudgeShake 0.5s ease-in-out 3" }}>
-                  <Trophy className="w-4 h-4" /> You were only {game.recordGap.toLocaleString()} points from the record!
+                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-orange-500/15 border border-orange-400/40 text-orange-300 text-xs sm:text-sm font-bold mb-2" style={{ animation: "nudgeShake 0.5s ease-in-out 3" }}>
+                  <Trophy className="w-4 h-4" /> Only {game.recordGap.toLocaleString()} pts from the record!
                 </div>
               )}
               {game.sessionStreak > 1 && (
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-500/15 border border-cyan-400/30 text-cyan-300 text-xs sm:text-sm font-bold mb-4">
-                  <Flame className="w-4 h-4" fill="currentColor" /> {game.sessionStreak} games in a row · {game.sessionMult.toFixed(1)}x bonus!
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-500/15 border border-cyan-400/30 text-cyan-300 text-xs sm:text-sm font-bold mb-3">
+                  <Flame className="w-4 h-4" fill="currentColor" /> {game.sessionStreak} in a row · {game.sessionMult.toFixed(1)}x bonus!
                 </div>
               )}
-              <div className="grid grid-cols-3 gap-2 mb-6">
-                <div className="bg-slate-800/60 border border-slate-700 rounded-xl p-3">
+              <div className="grid grid-cols-3 gap-2 mb-5">
+                <div className="bg-slate-800/60 border border-slate-700 rounded-xl p-2.5 sm:p-3">
                   <Flame className="w-4 h-4 text-orange-400 mx-auto mb-1" />
-                  <div className="text-orange-400 font-bold text-xl">{game.bestCombo}</div>
+                  <div className="text-orange-400 font-bold text-lg sm:text-xl">{game.bestCombo}</div>
                   <div className="text-slate-500 text-[10px]">Combo</div>
                 </div>
-                <div className="bg-slate-800/60 border border-slate-700 rounded-xl p-3">
+                <div className="bg-slate-800/60 border border-slate-700 rounded-xl p-2.5 sm:p-3">
                   <Trophy className="w-4 h-4 text-amber-400 mx-auto mb-1" />
-                  <div className="text-amber-400 font-bold text-xl">Lv {game.level}</div>
+                  <div className="text-amber-400 font-bold text-lg sm:text-xl">Lv {game.level}</div>
                   <div className="text-slate-500 text-[10px]">Level</div>
                 </div>
-                <div className="bg-slate-800/60 border border-slate-700 rounded-xl p-3">
+                <div className="bg-slate-800/60 border border-slate-700 rounded-xl p-2.5 sm:p-3">
                   <Star className="w-4 h-4 text-yellow-400 mx-auto mb-1" />
-                  <div className="text-yellow-400 font-bold text-xl">{game.totalGolden}</div>
+                  <div className="text-yellow-400 font-bold text-lg sm:text-xl">{game.totalGolden}</div>
                   <div className="text-slate-500 text-[10px]">Golden</div>
                 </div>
               </div>
 
-              <button onClick={() => setModal("chest")} className="mb-3 w-full px-8 py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold text-base sm:text-lg shadow-2xl shadow-amber-500/40 hover:scale-105 active:scale-95 transition-transform">
+              <button onClick={() => setModal("chest")} className="mb-2.5 w-full px-8 py-3 sm:py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold text-base sm:text-lg shadow-2xl shadow-amber-500/40 hover:scale-105 active:scale-95 transition-transform">
                 <span className="flex items-center justify-center gap-2"><Gift className="w-5 h-5" /> OPEN FREE CHEST</span>
               </button>
               {game.canRevive && game.score > 0 && (
-                <button onClick={game.revive} className="mb-3 w-full px-8 py-3.5 rounded-2xl bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold text-base sm:text-lg shadow-2xl shadow-green-500/40 hover:scale-105 active:scale-95 transition-transform">
+                <button onClick={game.revive} className="mb-2.5 w-full px-8 py-3 sm:py-3.5 rounded-2xl bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold text-base sm:text-lg shadow-2xl shadow-green-500/40 hover:scale-105 active:scale-95 transition-transform">
                   <span className="flex items-center justify-center gap-2"><Heart className="w-5 h-5" fill="currentColor" /> REVIVE (1 life)</span>
                 </button>
               )}
-              <button onClick={handleStartGame} className={`group w-full px-10 py-4 rounded-2xl text-white font-bold text-base sm:text-lg shadow-2xl hover:scale-105 active:scale-95 transition-transform ${lossChaseActive ? "bg-gradient-to-r from-orange-500 to-red-600 shadow-orange-500/40" : "bg-gradient-to-r from-cyan-500 to-blue-600 shadow-cyan-500/40"}`}>
+              <button onClick={handleStartGame} className={`group w-full px-10 py-3.5 sm:py-4 rounded-2xl text-white font-bold text-base sm:text-lg shadow-2xl hover:scale-105 active:scale-95 transition-transform mb-2.5 ${lossChaseActive ? "bg-gradient-to-r from-orange-500 to-red-600 shadow-orange-500/40" : "bg-gradient-to-r from-cyan-500 to-blue-600 shadow-cyan-500/40"}`}>
                 <span className="flex items-center justify-center gap-2"><RotateCcw className="w-5 h-5" /> {lossChaseActive ? `PLAY (${lossChase.multiplier}x BONUS!)` : !premium && lives <= 0 ? "GET LIVES" : "PLAY AGAIN"}</span>
               </button>
-              <button onClick={() => setModal("leaderboard")} className="mt-3 w-full px-8 py-3 rounded-2xl bg-slate-800/60 border border-slate-700 text-slate-300 font-bold text-sm hover:scale-105 active:scale-95 transition-transform">
-                <span className="flex items-center justify-center gap-2"><Trophy className="w-5 h-5 text-amber-400" /> VIEW RANKINGS</span>
-              </button>
-              {/* NEW: Go Home button */}
-              <button onClick={handleGoHome} className="mt-3 w-full px-8 py-3 rounded-2xl bg-slate-800/40 border border-slate-700/60 text-slate-400 font-bold text-sm hover:scale-105 active:scale-95 transition-transform">
-                <span className="flex items-center justify-center gap-2"><Home className="w-5 h-5" /> HOME</span>
-              </button>
+              <div className="flex gap-2">
+                <button onClick={() => setModal("leaderboard")} className="flex-1 px-4 py-2.5 sm:py-3 rounded-2xl bg-slate-800/60 border border-slate-700 text-slate-300 font-bold text-xs sm:text-sm hover:scale-105 active:scale-95 transition-transform">
+                  <span className="flex items-center justify-center gap-2"><Trophy className="w-5 h-5 text-amber-400" /> RANKS</span>
+                </button>
+                <button onClick={handleGoHome} className="flex-1 px-4 py-2.5 sm:py-3 rounded-2xl bg-slate-800/40 border border-slate-700/60 text-slate-400 font-bold text-xs sm:text-sm hover:scale-105 active:scale-95 transition-transform">
+                  <span className="flex items-center justify-center gap-2"><Home className="w-5 h-5" /> HOME</span>
+                </button>
+              </div>
               {game.autoRestartCountdown > 0 && (
-                <div className="mt-4 text-slate-400 text-sm">Restarting in <span className="text-cyan-400 font-bold" style={{ animation: "countdownPulse 1s ease-in-out infinite" }}>{game.autoRestartCountdown}</span>s</div>
+                <div className="mt-3 text-slate-400 text-sm">Restarting in <span className="text-cyan-400 font-bold" style={{ animation: "countdownPulse 1s ease-in-out infinite" }}>{game.autoRestartCountdown}</span>s</div>
               )}
             </div>
           </div>
@@ -970,22 +956,19 @@ const newHigh = Math.max(game.highScore, finalScore);
                   <span className="text-xs text-green-400 font-black tabular-nums">{game.luckyMult.toFixed(1)}x</span>
                 </div>
               )}
-             {gems > 0 && (
-  <div className="flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-full bg-fuchsia-500/10 border border-fuchsia-400/30">
-    <Gem className="w-3 h-3 text-fuchsia-300" />
-    <span className="text-xs text-fuchsia-300 font-black tabular-nums">{gems}</span>
-    <button onClick={() => setModal("gemShop")} className="ml-1 w-4 h-4 bg-fuchsia-500 rounded-full flex items-center justify-center text-slate-950 text-[10px] font-black">+</button>
-  </div>
-)}
-
-              {/* NEW: Squeeze ready indicator */}
+              {gems > 0 && (
+                <div className="flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-full bg-fuchsia-500/10 border border-fuchsia-400/30">
+                  <Gem className="w-3 h-3 text-fuchsia-300" />
+                  <span className="text-xs text-fuchsia-300 font-black tabular-nums">{gems}</span>
+                  <button onClick={() => setModal("gemShop")} className="ml-1 w-4 h-4 bg-fuchsia-500 rounded-full flex items-center justify-center text-slate-950 text-[10px] font-black">+</button>
+                </div>
+              )}
               {squeezeReady && (
                 <div className="flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-full bg-amber-500/15 border border-amber-400/40" style={{ animation: "pulseGlow 1s ease-in-out infinite" }}>
                   <Sparkles className="w-3 h-3 text-amber-300" />
                   <span className="text-[9px] sm:text-[10px] text-amber-300 font-bold">BIG REWARD READY!</span>
                 </div>
               )}
-              {/* NEW: Almost-jackpot rising indicator */}
               {game.almostJackpotActive && (
                 <div className="flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-full bg-amber-500/20 border-2 border-amber-400/50" style={{ animation: "pulseGlow 0.5s ease-in-out infinite" }}>
                   <Zap className="w-3 h-3 text-amber-300" fill="currentColor" />
@@ -1100,9 +1083,6 @@ const newHigh = Math.max(game.highScore, finalScore);
         </div>
       )}
 
-      {/* Mute button */}
-      
-
       {/* Achievement popups */}
       <div className="absolute top-16 right-3 z-50 flex flex-col gap-2 pointer-events-none max-w-[70%]">
         {achievements.map((a) => (
@@ -1165,7 +1145,6 @@ const newHigh = Math.max(game.highScore, finalScore);
               <X className="w-4 h-4" />
             </button>
 
-            {/* CHEST MODAL with near-miss tease */}
             {modal === "chest" && (
               <div className="bg-slate-900 border border-slate-700 rounded-3xl p-6 sm:p-8 text-center">
                 <h3 className="text-xl sm:text-2xl font-black text-white mb-1">Free Chest</h3>
@@ -1184,7 +1163,6 @@ const newHigh = Math.max(game.highScore, finalScore);
                     <div className="w-28 h-28 sm:w-32 sm:h-32 mx-auto rounded-3xl bg-gradient-to-br from-amber-500/20 to-orange-600/20 border-2 border-amber-400/40 flex items-center justify-center" style={{ animation: "chestShake 300ms ease-in-out infinite" }}>
                       <Gift className="w-14 h-14 sm:w-16 sm:h-16 text-amber-400" />
                     </div>
-                    {/* Tease rarity sequence */}
                     <div className="mt-4 flex items-center justify-center gap-1.5 flex-wrap">
                       {chestTeaseRarities.map((r, i) => {
                         const colors: Record<ChestRarity, string> = {
@@ -1193,14 +1171,14 @@ const newHigh = Math.max(game.highScore, finalScore);
                         };
                         return (
                           <div
-  key={i}
-  className={`w-3 h-3 rounded-full transition-all ${
-    i === chestTeaseIndex
-      ? `${colors[r]} scale-150 shadow-lg`
-      : "bg-slate-700"
-  }`}
-  style={i === chestTeaseIndex ? { animation: "scoreBump 150ms ease-out" } : undefined}
-/>
+                            key={i}
+                            className={`w-3 h-3 rounded-full transition-all ${
+                              i === chestTeaseIndex
+                                ? `${colors[r]} scale-150 shadow-lg`
+                                : "bg-slate-700"
+                            }`}
+                            style={i === chestTeaseIndex ? { animation: "scoreBump 150ms ease-out" } : undefined}
+                          />
                         );
                       })}
                     </div>
@@ -1227,7 +1205,6 @@ const newHigh = Math.max(game.highScore, finalScore);
               </div>
             )}
 
-            {/* WHEEL MODAL */}
             {modal === "wheel" && (
               <div className="bg-slate-900 border border-slate-700 rounded-3xl p-6 sm:p-8 text-center">
                 <h3 className="text-xl sm:text-2xl font-black text-white mb-1">Daily Wheel</h3>
@@ -1258,7 +1235,6 @@ const newHigh = Math.max(game.highScore, finalScore);
               </div>
             )}
 
-            {/* SHOP MODAL */}
             {modal === "shop" && (
               <div className="bg-slate-900 border border-slate-700 rounded-3xl p-6 sm:p-8">
                 <div className="flex items-center justify-between mb-4">
@@ -1283,7 +1259,6 @@ const newHigh = Math.max(game.highScore, finalScore);
               </div>
             )}
 
-            {/* QUESTS MODAL */}
             {modal === "quests" && (
               <div className="bg-slate-900 border border-slate-700 rounded-3xl p-6 sm:p-8">
                 <div className="flex items-center justify-between mb-4">
@@ -1313,7 +1288,6 @@ const newHigh = Math.max(game.highScore, finalScore);
               </div>
             )}
 
-            {/* COLLECTION MODAL */}
             {modal === "collection" && (
               <div className="bg-slate-900 border border-slate-700 rounded-3xl p-6 sm:p-8">
                 <div className="flex items-center justify-between mb-4">
@@ -1340,20 +1314,18 @@ const newHigh = Math.max(game.highScore, finalScore);
               </div>
             )}
 
-            {/* LEADERBOARD MODAL */}
             {modal === "leaderboard" && (
               <LeaderboardModal entries={leaderboardEntries} rivalBeatenCount={rivalBeatenCount} onClose={closeModal} />
             )}
 
-            {/* INVITE MODAL */}
             {modal === "invite" && (
-              <InviteModal open={true} onClose={closeModal} onRewardsClaimed={handleInviteRewardsClaimed}  />
-            )} 
+              <InviteModal open={true} onClose={closeModal} onRewardsClaimed={handleInviteRewardsClaimed} />
+            )}
             {modal === "gacha" && <GachaModal open={true} onClose={closeModal} gems={gems} pity={gachaPity} onPull={handleGachaPull} />}
-{modal === "mystery" && <MysteryBoxModal open={true} onClose={closeModal} />}
-{modal === "tiered" && <TieredChestsModal open={true} onClose={closeModal} gems={gems} />}
-{showTemptation && <TemptationOfferModal open={true} onClose={() => setShowTemptation(false)} />}
-{showFirstOffer && <FirstGameOverOfferModal open={true} onClose={() => setShowFirstOffer(false)} />}
+            {modal === "mystery" && <MysteryBoxModal open={true} onClose={closeModal} />}
+            {modal === "tiered" && <TieredChestsModal open={true} onClose={closeModal} gems={gems} />}
+            {showTemptation && <TemptationOfferModal open={true} onClose={() => setShowTemptation(false)} />}
+            {showFirstOffer && <FirstGameOverOfferModal open={true} onClose={() => setShowFirstOffer(false)} />}
             {modal === "gemShop" && <ShopModal open={true} onClose={closeModal} />}
 
           </div>
