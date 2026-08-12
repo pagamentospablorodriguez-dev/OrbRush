@@ -320,6 +320,23 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game.gameState]);
 
+  // Auto-restart from gameover — only when countdown reaches 0, no offers/modals are showing,
+  // and the player has lives (or is premium). Respects all on-screen conditions.
+  useEffect(() => {
+    if (game.autoRestartCountdown === 0 && game.gameState === "gameover") {
+      // Don't auto-restart if any modal or offer is currently showing
+      if (modal || showDoubleOrNothing || showContinueOffer || showTemptation || showFirstOffer || showPaywall || showStarterPack || showLimitedOffer) {
+        return;
+      }
+      // Don't auto-restart if player has no lives and isn't premium
+      if (!premium && getLives() <= 0) {
+        return;
+      }
+      handleStartGame();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [game.autoRestartCountdown, game.gameState]);
+
   useEffect(() => {
     if (game.gameState === "playing" && game.score > 0 && game.challengeTarget > 0 && !game.challengeDone) {
       const t = setTimeout(() => updateChallengeProgress(game.score), 1000);
@@ -364,6 +381,8 @@ function App() {
         "add_gems_600": "600 gems added!",
         "add_gems_1500": "1500 gems added!",
         "add_gems_5000": "5000 gems added!",
+        "starter_pack": "Starter Pack activated! 300 gems + Shield!",
+        "legendary_chest_50off": "Legendary Chest added!",
       };
       setActivationToast(messages[activationResult] || "Purchase activated!");
       setTimeout(() => setActivationToast(null), 4500);
