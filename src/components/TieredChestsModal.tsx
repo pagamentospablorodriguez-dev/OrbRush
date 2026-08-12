@@ -1,60 +1,94 @@
-import { Gem, X, Crown, Sparkles, Package } from "lucide-react";
-import { TIERED_CHESTS } from "@/lib/tieredChests";
-import { rollChest, rarityIndex } from "@/lib/chest";
-import { saveStats, addGems } from "@/lib/supabase";
 import { useState } from "react";
-import { playChestReveal, playChestNearMiss } from "@/lib/sound";
+import { Gem, X, Crown, Sparkles, Gift } from "lucide-react";
+import { TIERED_CHESTS } from "@/lib/tieredChests";
+import { rollChest, type ChestReward } from "@/lib/chest";
+import { addGems } from "@/lib/supabase";
+import { playChestTease, playChestReveal, playChestNearMiss } from "@/lib/sound";
 
 interface Props { open: boolean; onClose: () => void; gems: number; }
 
 export function TieredChestsModal({ open, onClose, gems }: Props) {
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<ChestReward | null>(null);
+  const [opening, setOpening] = useState(false);
+  const [openingId, setOpeningId] = useState<string | null>(null);
 
   const handleBuy = (chest: any) => {
-    if (gems < chest.cost) return;
-    // Lógica simplificada: baús melhores têm probabilidade melhor (implementada no lib/chest se quiser)
-    const reward = rollChest(); 
-    setResult(reward);
-    addGems(-chest.cost + reward.gems);
-    if (reward.rarity === "legendary" || reward.rarity === "mythic") playChestReveal();
-    else playChestNearMiss();
+    if (gems < chest.cost || opening) return;
+    setOpening(true);
+    setOpeningId(chest.id);
+    setResult(null);
+
+    let teaseCount = 0;
+    const interval = setInterval(() => {
+      playChestTease();
+      teaseCount++;
+      if (teaseCount >= 8) {
+        clearInterval(interval);
+        const reward = rollChest();
+        addGems(-chest.cost + reward.gems);
+        setResult(reward);
+        setOpening(false);
+        setOpeningId(null);
+        if (reward.rarity === "legendary" || reward.rarity === "mythic") playChestReveal();
+        else playChestNearMiss();
+      }
+    }, 150);
   };
 
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4">
-      <div className="relative max-w-md w-full bg-slate-900 border-2 border-emerald-500/50 rounded-3xl p-6 shadow-2xl">
-        <button onClick={onClose} className="absolute top-4 right-4 text-slate-500"><X className="w-6 h-6"/></button>
-        <h2 className="text-2xl font-black text-white mb-6 text-center">Premium Chests</h2>
+    <div className="fixed inset-0 z-[100] bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+      <div className="relative max-w-md w-full my-auto bg-slate-900 border-2 border-emerald-500/50 rounded-3xl p-6 shadow-2xl">
+        <button onClick={onClose} className="absolute top-4 right-4 text-slate-500 hover:text-white z-10"><X className="w-6 h-6"/></button>
+
+        <div className="flex items-center justify-center gap-2 mb-1">
+          <Gift className="w-6 h-6 text-emerald-400" />
+          <h2 className="text-2xl font-black text-white">Premium Chests</h2>
+        </div>
+        <p className="text-slate-400 text-xs mb-6 text-center">Better odds at rare rewards!</p>
 
         <div className="grid gap-3">
-          {TIERED_CHESTS.map((chest) => (
-            <button 
-              key={chest.id}
-              onClick={() => handleBuy(chest)}
-              disabled={gems < chest.cost}
-              className="flex items-center justify-between p-4 rounded-2xl bg-slate-800 border border-slate-700 hover:border-emerald-500/50 transition-all disabled:opacity-50"
-            >
-              <div className="flex items-center gap-3">
-                <span className="text-3xl">{chest.icon}</span>
-                <div className="text-left">
-                  <div className={`font-black ${chest.color}`}>{chest.name}</div>
-                  <div className="text-[10px] text-slate-500 uppercase font-bold">Better Odds</div>
+          {TIERED_CHESTS.map((chest) => {
+            const isOpeningThis = opening && openingId === chest.id;
+            return (
+              <button
+                key={chest.id}
+                onClick={() => handleBuy(chest)}
+                disabled={gems < chest.cost || opening}
+                className="flex items-center justify-between p-4 rounded-2xl bg-slate-800 border border-slate-700 hover:border-emerald-500/50 transition-all disabled:opacity-50 relative overflow-hidden"
+              >
+                <div className="flex items-center gap-3">
+                  <div
+                    className="text-3xl"
+                    style={isOpeningThis ? { animation: "chestShake 300ms ease-in-out infinite" } : undefined}
+                  >
+                    {chest.icon}
+                  </div>
+                  <div className="text-left">
+                    <div className={`font-black ${chest.color}`}>{chest.name}</div>
+                    <div className="text-[10px] text-slate-500 uppercase font-bold">Better Odds</div>
+                  </div>
                 </div>
-              </div>
-              <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-950 border border-slate-700">
-                <Gem className="w-3 h-3 text-fuchsia-400" />
-                <span className="text-sm font-black text-white">{chest.cost}</span>
-              </div>
-            </button>
-          ))}
+                <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-950 border border-slate-700">
+                  <Gem className="w-3 h-3 text-fuchsia-400" />
+                  <span className="text-sm font-black text-white">{chest.cost}</span>
+                </div>
+              </button>
+            );
+          })}
         </div>
 
         {result && (
-          <div className="mt-6 p-4 rounded-2xl bg-emerald-500/10 border border-emerald-400/30 text-center animate-in zoom-in">
+          <div className="mt-6 p-4 rounded-2xl bg-emerald-500/10 border border-emerald-400/30 text-center" style={{ animation: "modalIn 0.3s ease-out" }}>
+            <div className="text-4xl mb-2" style={{ animation: "chestBurst 0.5s ease-out" }}>
+              {result.rarity === "mythic" ? "🏆" : result.rarity === "legendary" ? "👑" : "💎"}
+            </div>
             <div className="text-emerald-400 font-black text-xl">+{result.gems} GEMS!</div>
-            <div className="text-slate-500 text-[10px] font-bold">FROM {result.rarity.toUpperCase()} CHEST</div>
+            <div className="text-slate-500 text-[10px] font-bold">{result.rarity.toUpperCase()} REWARD</div>
+            <button onClick={() => setResult(null)} className="mt-3 px-6 py-2 rounded-xl bg-emerald-500 text-white font-bold text-sm hover:scale-105 active:scale-95 transition-transform">
+              Continue
+            </button>
           </div>
         )}
       </div>
