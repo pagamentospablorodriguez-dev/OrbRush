@@ -355,25 +355,22 @@ export function playComboGrief() {
 // within a user gesture (tap/click). This function must be called from
 // a click/tap handler (e.g. handleStartGame, handleOrbTap).
 export function unlockAudio() {
-  if (muted) return;
-  if (!ctx) {
-    try {
+  try {
+    if (!ctx) {
       ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-    } catch {
-      return;
     }
-  }
-  if (ctx && ctx.state === "suspended") {
-    ctx.resume();
-  }
-  // Play a silent buffer to fully unlock the audio pipeline on iOS
-  if (ctx && ctx.state === "running") {
-    try {
-      const buffer = ctx.createBuffer(1, 1, 22050);
-      const source = ctx.createBufferSource();
-      source.buffer = buffer;
-      source.connect(ctx.destination);
-      source.start(0);
-    } catch {}
-  }
+    if (ctx.state === "suspended") {
+      ctx.resume();
+    }
+    if (ctx) {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      gain.gain.value = 0.001;
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.1);
+    }
+  } catch {}
 }
+
