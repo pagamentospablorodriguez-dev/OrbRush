@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { useParticleCanvas } from "@/lib/particles";
 import { useGame, type Orb, type Achievement, type PowerUps } from "@/lib/useGame";
-import { setMuted, isMuted, playChestTease, playChestReveal, playChestNearMiss, playSocialNotification, playLossChase, playCountdown } from "@/lib/sound";
+import { setMuted, isMuted, unlockAudio, playChestTease, playChestReveal, playChestNearMiss, playSocialNotification, playLossChase, playCountdown } from "@/lib/sound";
 import {
   loadStats, saveStats, updateDailyStreak, rollDailyChallenge, updateChallengeProgress,
   rollDailyQuests, updateQuestProgress, claimQuestRewards, canSpinWheel, spinWheelSave,
@@ -394,10 +394,12 @@ function App() {
 
   const handleOrbTap = (orb: Orb, e: React.PointerEvent) => {
     e.stopPropagation();
+    unlockAudio();
     game.tapOrb(orb, e.clientX, e.clientY);
   };
 
   const handleStartGame = () => {
+    unlockAudio();
     if (!premium) {
       const currentLives = getLives();
       if (currentLives <= 0) {
@@ -532,7 +534,7 @@ function App() {
         @keyframes shake { 0%,100%{transform:translate(0,0)} 20%{transform:translate(-${shake}px,${shake/2}px)} 40%{transform:translate(${shake}px,-${shake/2}px)} 60%{transform:translate(-${shake/2}px,-${shake/3}px)} 80%{transform:translate(${shake/2}px,${shake/3}px)} }
         @keyframes orbPulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.08)} }
         @keyframes orbAppear { 0%{transform:scale(0) rotate(-180deg);opacity:0} 60%{transform:scale(1.15) rotate(10deg);opacity:1} 100%{transform:scale(1) rotate(0);opacity:1} }
-        @keyframes slideUp { from{transform:translateY(30px);opacity:0} to{transform:translateY(0);opacity:1} }
+        @keyframes fadeIn { from{opacity:0} to{opacity:1} }
         @keyframes slideDownFade { 0%{transform:translateY(-20px);opacity:0} 15%{transform:translateY(0);opacity:1} 85%{transform:translateY(0);opacity:1} 100%{transform:translateY(-20px);opacity:0} }
         @keyframes slideInLeft { 0%{transform:translateX(-100%);opacity:0} 15%{transform:translateX(0);opacity:1} 85%{transform:translateX(0);opacity:1} 100%{transform:translateX(-100%);opacity:0} }
         @keyframes pulseGlow { 0%,100%{box-shadow:0 0 20px 5px rgba(251,191,36,0.3)} 50%{box-shadow:0 0 40px 15px rgba(251,191,36,0.6)} }
@@ -559,12 +561,7 @@ function App() {
         @keyframes streakWarningPulse { 0%,100%{opacity:0.7} 50%{opacity:1} }
         @keyframes collectionPop { 0%{transform:scale(0) rotate(-15deg);opacity:0} 60%{transform:scale(1.2) rotate(5deg);opacity:1} 100%{transform:scale(1) rotate(0);opacity:1} }
         @keyframes playGlow { 0%,100%{box-shadow:0 0 25px 8px rgba(34,211,238,0.4),0 0 50px 15px rgba(34,211,238,0.2)} 50%{box-shadow:0 0 40px 15px rgba(34,211,238,0.7),0 0 70px 25px rgba(34,211,238,0.3)} }
-        @keyframes logoFloat { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
-        @keyframes shimmer { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
-        @keyframes ctaPulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.03)} }
-        @keyframes gemPop { 0%{transform:scale(0) rotate(-180deg);opacity:0} 60%{transform:scale(1.2) rotate(10deg);opacity:1} 100%{transform:scale(1) rotate(0);opacity:1} }
         @keyframes lowGemsPulse { 0%,100%{opacity:0.6} 50%{opacity:1} }
-        @keyframes glowBorder { 0%,100%{border-color:rgba(251,191,36,0.3)} 50%{border-color:rgba(251,191,36,0.6)} }
       `}</style>
 
       <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none z-30" />
@@ -618,19 +615,19 @@ function App() {
 
         {/* IDLE / START SCREEN */}
         {game.gameState === "idle" && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center z-20 overflow-y-auto py-6 px-4">
-            <div className="text-center w-full max-w-lg mx-auto" style={{ animation: "slideUp 600ms ease-out" }}>
+          <div className="absolute inset-0 flex flex-col items-center justify-center z-20 overflow-y-auto py-4 px-4" style={{ animation: "fadeIn 400ms ease-out", WebkitOverflowScrolling: "touch" }}>
+            <div className="text-center w-full max-w-lg mx-auto flex flex-col items-center">
               {/* Streak FOMO warning */}
               {showStreakWarning && game.dailyStreak >= 2 && (
-                <div className="mb-3 inline-flex items-center gap-2 px-3 sm:px-4 py-2 rounded-full bg-orange-500/15 border border-orange-400/40 text-orange-300 text-xs sm:text-sm font-bold" style={{ animation: "streakWarningPulse 1.5s ease-in-out infinite" }}>
+                <div className="mb-2 inline-flex items-center gap-2 px-3 sm:px-4 py-1.5 rounded-full bg-orange-500/15 border border-orange-400/40 text-orange-300 text-xs font-bold" style={{ animation: "streakWarningPulse 1.5s ease-in-out infinite" }}>
                   <AlertTriangle className="w-4 h-4 flex-shrink-0" />
                   {game.dailyStreak}-day streak! Don't lose it!
                 </div>
               )}
 
-              {/* GEMS COUNTER + SHOP BUTTON — single, top-right */}
-              <div className="absolute top-4 right-4 z-50">
-                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900/80 backdrop-blur-md border border-slate-700/50 rounded-full shadow-lg">
+              {/* GEMS COUNTER — single, top-right, fixed */}
+              <div className="fixed top-3 right-3 z-50">
+                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900/90 backdrop-blur-md border border-slate-700/50 rounded-full shadow-lg">
                   <Gem className="w-3.5 h-3.5 text-emerald-400" fill="currentColor" />
                   <span className="text-xs font-black text-white tabular-nums">{gems.toLocaleString()}</span>
                   <button
@@ -642,14 +639,14 @@ function App() {
                 </div>
               </div>
 
-              {/* LOGO */}
-              <img src="/Bune_Logo.png" alt="OrbRush" className="w-20 h-20 sm:w-24 sm:h-24 mx-auto mb-2 object-contain" style={{ animation: "logoFloat 3s ease-in-out infinite" }} />
+              {/* LOGO — no float animation to prevent layout trembling */}
+              <img src="/Bune_Logo.png" alt="OrbRush" className="w-16 h-16 sm:w-20 sm:h-20 mb-1 object-contain drop-shadow-[0_0_15px_rgba(34,211,238,0.3)]" />
 
-              <h1 className="text-2xl sm:text-4xl font-black text-white mb-3 tracking-tight">ORBRUSH<span className="text-cyan-400">.FUN</span></h1>
+              <h1 className="text-xl sm:text-3xl font-black text-white mb-2 tracking-tight">ORBRUSH<span className="text-cyan-400">.FUN</span></h1>
 
               {/* Lives indicator (non-premium) */}
               {!premium && (
-                <div className="mb-3 inline-flex items-center gap-2 px-3 sm:px-4 py-2 rounded-full bg-rose-500/15 border border-rose-400/30">
+                <div className="mb-2 inline-flex items-center gap-2 px-3 sm:px-4 py-1.5 rounded-full bg-rose-500/15 border border-rose-400/30">
                   <div className="flex items-center gap-1">
                     {Array.from({ length: MAX_LIVES }).map((_, i) => (
                       <Heart key={i} className={`w-3.5 h-3.5 ${i < lives ? "text-rose-500 fill-rose-500" : "text-slate-700"}`} />
@@ -666,73 +663,70 @@ function App() {
                 </div>
               )}
 
-              {/* Badges — no gems here, that's top-right */}
-              <div className="flex flex-wrap items-center justify-center gap-1.5 mb-3">
+              {/* Badges */}
+              <div className="flex flex-wrap items-center justify-center gap-1.5 mb-2">
                 {game.prestige > 0 && (
-                  <div className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-full bg-amber-500/15 border border-amber-400/30 text-amber-300 text-xs sm:text-sm font-bold">
-                    <Crown className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> P{game.prestige} · +{Math.round(game.prestige * 10)}%
+                  <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-500/15 border border-amber-400/30 text-amber-300 text-xs font-bold">
+                    <Crown className="w-3 h-3" /> P{game.prestige} +{Math.round(game.prestige * 10)}%
                   </div>
                 )}
                 {game.sessionStreak > 1 && (
-                  <div className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-full bg-cyan-500/15 border border-cyan-400/30 text-cyan-300 text-xs sm:text-sm font-bold">
-                    <Flame className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="currentColor" /> {game.sessionStreak}x · {game.sessionMult.toFixed(1)}x
+                  <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-cyan-500/15 border border-cyan-400/30 text-cyan-300 text-xs font-bold">
+                    <Flame className="w-3 h-3" fill="currentColor" /> {game.sessionStreak}x
                   </div>
                 )}
                 {collectionStats.discovered > 0 && (
-                  <div className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-400/30 text-emerald-300 text-xs sm:text-sm font-bold">
-                    <BookOpen className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> {collectionStats.discovered}/{collectionStats.total}
+                  <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-400/30 text-emerald-300 text-xs font-bold">
+                    <BookOpen className="w-3 h-3" /> {collectionStats.discovered}/{collectionStats.total}
                   </div>
                 )}
               </div>
 
               {/* Active power-ups */}
               {activePowerUpCount > 0 && (
-                <div className="mb-3 flex items-center justify-center gap-1.5 flex-wrap">
-                  {activePowerUps.shield && <span className="text-xs px-2 py-1 rounded-full bg-blue-500/20 border border-blue-400/40 text-blue-300 font-bold">🛡️ Shield</span>}
-                  {activePowerUps.extra_life && <span className="text-xs px-2 py-1 rounded-full bg-rose-500/20 border border-rose-400/40 text-rose-300 font-bold">❤️ Extra Life</span>}
-                  {activePowerUps.frenzy && <span className="text-xs px-2 py-1 rounded-full bg-orange-500/20 border border-orange-400/40 text-orange-300 font-bold">⚡ Frenzy</span>}
-                  {activePowerUps.double && <span className="text-xs px-2 py-1 rounded-full bg-fuchsia-500/20 border border-fuchsia-400/40 text-fuchsia-300 font-bold">✨ Double</span>}
-                  {activePowerUps.freeze && <span className="text-xs px-2 py-1 rounded-full bg-sky-500/20 border border-sky-400/40 text-sky-300 font-bold">❄️ Freeze</span>}
+                <div className="mb-2 flex items-center justify-center gap-1 flex-wrap">
+                  {activePowerUps.shield && <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/20 border border-blue-400/40 text-blue-300 font-bold">🛡️</span>}
+                  {activePowerUps.extra_life && <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-500/20 border border-rose-400/40 text-rose-300 font-bold">❤️</span>}
+                  {activePowerUps.frenzy && <span className="text-[10px] px-2 py-0.5 rounded-full bg-orange-500/20 border border-orange-400/40 text-orange-300 font-bold">⚡</span>}
+                  {activePowerUps.double && <span className="text-[10px] px-2 py-0.5 rounded-full bg-fuchsia-500/20 border border-fuchsia-400/40 text-fuchsia-300 font-bold">✨</span>}
+                  {activePowerUps.freeze && <span className="text-[10px] px-2 py-0.5 rounded-full bg-sky-500/20 border border-sky-400/40 text-sky-300 font-bold">❄️</span>}
                 </div>
               )}
 
-              <p className="text-slate-400 text-sm sm:text-lg mb-1">Tap the orbs. Build combos. Unlock achievements.</p>
-              <p className="text-slate-500 text-xs sm:text-sm mb-4">How many points can you score before losing all your lives?</p>
-
               {/* PLAY button — big, glowing, most prominent */}
-              <button onClick={handleStartGame} className="group relative px-12 sm:px-14 py-4 sm:py-5 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-black text-xl sm:text-2xl transition-transform hover:scale-105 active:scale-95" style={{ animation: "playGlow 2s ease-in-out infinite" }}>
-                <span className="flex items-center gap-3"><Play className="w-6 h-6 sm:w-7 sm:h-7" fill="white" />{!premium && lives <= 0 ? "GET LIVES" : "PLAY"}</span>
+              <button onClick={handleStartGame} className="relative px-12 sm:px-14 py-3.5 sm:py-4 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-black text-lg sm:text-2xl transition-transform hover:scale-105 active:scale-95 mt-1" style={{ animation: "playGlow 2s ease-in-out infinite" }}>
+                <span className="flex items-center gap-3"><Play className="w-5 h-5 sm:w-6 sm:h-6" fill="white" />{!premium && lives <= 0 ? "GET LIVES" : "PLAY"}</span>
               </button>
 
               {/* Low gems prompt */}
               {gems < 100 && (
-                <div className="mt-3 text-amber-400/70 text-xs font-bold" style={{ animation: "lowGemsPulse 2s ease-in-out infinite" }}>
+                <div className="mt-1.5 text-amber-400/70 text-[10px] font-bold" style={{ animation: "lowGemsPulse 2s ease-in-out infinite" }}>
                   Low on gems? Tap + to get more!
                 </div>
               )}
 
-              {/* Meta-game buttons — clean grid */}
-              <div className="mt-4 mb-3 flex items-center justify-center gap-1.5 sm:gap-2 flex-wrap">
-                <button onClick={() => setModal("chest")} className="flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl bg-amber-500/15 border border-amber-400/30 text-amber-300 font-bold text-xs sm:text-sm hover:bg-amber-500/25 transition-colors">
-                  <Gift className="w-4 h-4" /> Chest
+              {/* Meta-game buttons — compact grid */}
+              <div className="mt-3 flex items-center justify-center gap-1 sm:gap-1.5 flex-wrap">
+                <button onClick={() => setModal("chest")} className="flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-lg bg-amber-500/15 border border-amber-400/30 text-amber-300 font-bold text-[11px] sm:text-xs hover:bg-amber-500/25 transition-colors">
+                  <Gift className="w-3.5 h-3.5" /> Chest
                 </button>
-                <button onClick={() => setModal("wheel")} disabled={!wheelAvailable} className="flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl bg-cyan-500/15 border border-cyan-400/30 text-cyan-300 font-bold text-xs sm:text-sm hover:bg-cyan-500/25 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
-                  <Target className="w-4 h-4" /> Wheel
+                <button onClick={() => setModal("wheel")} disabled={!wheelAvailable} className="flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-lg bg-cyan-500/15 border border-cyan-400/30 text-cyan-300 font-bold text-[11px] sm:text-xs hover:bg-cyan-500/25 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                  <Target className="w-3.5 h-3.5" /> Wheel
                 </button>
-                <button onClick={() => setModal("quests")} className="flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl bg-green-500/15 border border-green-400/30 text-green-300 font-bold text-xs sm:text-sm hover:bg-green-500/25 transition-colors">
-                  <CheckCircle2 className="w-4 h-4" /> Quests
+                <button onClick={() => setModal("quests")} className="flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-lg bg-green-500/15 border border-green-400/30 text-green-300 font-bold text-[11px] sm:text-xs hover:bg-green-500/25 transition-colors">
+                  <CheckCircle2 className="w-3.5 h-3.5" /> Quests
                 </button>
-                <button onClick={() => setModal("shop")} className="flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl bg-fuchsia-500/15 border border-fuchsia-400/30 text-fuchsia-300 font-bold text-xs sm:text-sm hover:bg-fuchsia-500/25 transition-colors">
-                  <ShoppingBag className="w-4 h-4" /> Shop
+                <button onClick={() => setModal("shop")} className="flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-lg bg-fuchsia-500/15 border border-fuchsia-400/30 text-fuchsia-300 font-bold text-[11px] sm:text-xs hover:bg-fuchsia-500/25 transition-colors">
+                  <ShoppingBag className="w-3.5 h-3.5" /> Shop
                 </button>
-                <button onClick={() => setModal("collection")} className="flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl bg-emerald-500/15 border border-emerald-400/30 text-emerald-300 font-bold text-xs sm:text-sm hover:bg-emerald-500/25 transition-colors">
-                  <BookOpen className="w-4 h-4" /> Collection
+                <button onClick={() => setModal("collection")} className="flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-lg bg-emerald-500/15 border border-emerald-400/30 text-emerald-300 font-bold text-[11px] sm:text-xs hover:bg-emerald-500/25 transition-colors">
+                  <BookOpen className="w-3.5 h-3.5" /> Orbs
                 </button>
-                <button onClick={() => setModal("leaderboard")} className="flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl bg-amber-500/15 border border-amber-400/30 text-amber-300 font-bold text-xs sm:text-sm hover:bg-amber-500/25 transition-colors">
-                  <Trophy className="w-4 h-4" /> Ranks
+                <button onClick={() => setModal("leaderboard")} className="flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-lg bg-amber-500/15 border border-amber-400/30 text-amber-300 font-bold text-[11px] sm:text-xs hover:bg-amber-500/25 transition-colors">
+                  <Trophy className="w-3.5 h-3.5" /> Ranks
                 </button>
-                <button onClick={() => setModal("invite")} className="flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl bg-cyan-500/15 border border-cyan-400/30 text-cyan-300 font-bold text-xs sm:text-sm hover:bg-cyan-500/25 transition-colors relative">
-                  <Users className="w-4 h-4" /> Invite
+                <button onClick={() => setModal("invite")} className="flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-lg bg-cyan-500/15 border border-cyan-400/30 text-cyan-300 font-bold text-[11px] sm:text-xs hover:bg-cyan-500/25 transition-colors relative">
+                  <Users className="w-3.5 h-3.5" /> Invite
                   {pendingInviteGems > 0 && (
                     <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-green-500 border border-slate-900 flex items-center justify-center" style={{ animation: "pulseGlow 1s ease-in-out infinite" }}>
                       <span className="text-[8px] font-black text-white">!</span>
@@ -741,166 +735,171 @@ function App() {
                 </button>
               </div>
 
-              {/* Monetization buttons — prominent, enticing */}
-              <div className="grid grid-cols-3 gap-2 mb-4">
-                <button onClick={() => setModal("gacha")} className="relative py-3 bg-gradient-to-br from-purple-600/40 to-purple-800/40 hover:from-purple-600/60 hover:to-purple-800/60 text-purple-200 font-bold rounded-xl border border-purple-500/40 transition-all flex flex-col items-center gap-1 hover:scale-105 active:scale-95">
-                  <Swords className="w-5 h-5" />
-                  <span className="text-[10px]">SUMMON</span>
+              {/* Monetization buttons — compact, enticing */}
+              <div className="grid grid-cols-3 gap-1.5 sm:gap-2 mt-2 w-full max-w-xs">
+                <button onClick={() => setModal("gacha")} className="relative py-2 sm:py-2.5 bg-gradient-to-br from-purple-600/40 to-purple-800/40 hover:from-purple-600/60 hover:to-purple-800/60 text-purple-200 font-bold rounded-xl border border-purple-500/40 transition-all flex flex-col items-center gap-0.5 hover:scale-105 active:scale-95">
+                  <Swords className="w-4 h-4 sm:w-5 sm:h-5" />
+                  <span className="text-[9px] sm:text-[10px]">SUMMON</span>
                   <span className="text-[8px] text-purple-400">100 💎</span>
                 </button>
-                <button onClick={() => setModal("mystery")} className="relative py-3 bg-gradient-to-br from-amber-600/40 to-amber-800/40 hover:from-amber-600/60 hover:to-amber-800/60 text-amber-200 font-bold rounded-xl border border-amber-500/40 transition-all flex flex-col items-center gap-1 hover:scale-105 active:scale-95">
-                  <Timer className="w-5 h-5" />
-                  <span className="text-[10px]">MYSTERY BOX</span>
+                <button onClick={() => setModal("mystery")} className="relative py-2 sm:py-2.5 bg-gradient-to-br from-amber-600/40 to-amber-800/40 hover:from-amber-600/60 hover:to-amber-800/60 text-amber-200 font-bold rounded-xl border border-amber-500/40 transition-all flex flex-col items-center gap-0.5 hover:scale-105 active:scale-95">
+                  <Timer className="w-4 h-4 sm:w-5 sm:h-5" />
+                  <span className="text-[9px] sm:text-[10px]">MYSTERY</span>
                   <span className="text-[8px] text-amber-400">50 💎</span>
                 </button>
-                <button onClick={() => setModal("tiered")} className="relative py-3 bg-gradient-to-br from-emerald-600/40 to-emerald-800/40 hover:from-emerald-600/60 hover:to-emerald-800/60 text-emerald-200 font-bold rounded-xl border border-emerald-500/40 transition-all flex flex-col items-center gap-1 hover:scale-105 active:scale-95">
-                  <Gift className="w-5 h-5" />
-                  <span className="text-[10px]">CHESTS</span>
+                <button onClick={() => setModal("tiered")} className="relative py-2 sm:py-2.5 bg-gradient-to-br from-emerald-600/40 to-emerald-800/40 hover:from-emerald-600/60 hover:to-emerald-800/60 text-emerald-200 font-bold rounded-xl border border-emerald-500/40 transition-all flex flex-col items-center gap-0.5 hover:scale-105 active:scale-95">
+                  <Gift className="w-4 h-4 sm:w-5 sm:h-5" />
+                  <span className="text-[9px] sm:text-[10px]">CHESTS</span>
                   <span className="text-[8px] text-emerald-400">100+ 💎</span>
                 </button>
               </div>
 
               {/* Challenge */}
               {game.challengeTarget > 0 && !game.challengeDone && (
-                <div className="mb-4 flex items-center justify-center gap-3 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl bg-green-500/10 border border-green-400/30">
-                  <Target className="w-5 h-5 text-green-400 flex-shrink-0" />
+                <div className="mt-3 flex items-center justify-center gap-2 px-3 sm:px-4 py-2 rounded-xl bg-green-500/10 border border-green-400/30">
+                  <Target className="w-4 h-4 text-green-400 flex-shrink-0" />
                   <div className="text-left">
-                    <div className="text-green-300 font-bold text-xs sm:text-sm">Daily Challenge</div>
-                    <div className="text-slate-400 text-[10px] sm:text-xs">Reach {game.challengeTarget.toLocaleString()} points today</div>
+                    <div className="text-green-300 font-bold text-xs">Daily Challenge</div>
+                    <div className="text-slate-400 text-[10px]">Reach {game.challengeTarget.toLocaleString()} points</div>
                   </div>
                 </div>
               )}
               {game.challengeDone && (
-                <div className="mb-4 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-green-500/20 border border-green-400/40 text-green-300 font-bold text-xs sm:text-sm">
+                <div className="mt-3 inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-green-500/20 border border-green-400/40 text-green-300 font-bold text-xs">
                   <Award className="w-4 h-4" /> Challenge complete!
                 </div>
               )}
 
               {/* Stats grid */}
               {loadedStats && (
-                <div className="grid grid-cols-4 gap-1.5 sm:gap-2 mb-4">
-                  <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-2 sm:p-2.5">
-                    <Trophy className="w-4 h-4 text-amber-400 mx-auto mb-1" />
-                    <div className="text-amber-400 font-bold text-base sm:text-lg">{loadedStats.high.toLocaleString()}</div>
-                    <div className="text-slate-500 text-[10px]">Best</div>
+                <div className="grid grid-cols-4 gap-1.5 sm:gap-2 mt-3">
+                  <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-2">
+                    <Trophy className="w-4 h-4 text-amber-400 mx-auto mb-0.5" />
+                    <div className="text-amber-400 font-bold text-sm sm:text-base">{loadedStats.high.toLocaleString()}</div>
+                    <div className="text-slate-500 text-[9px]">Best</div>
                   </div>
-                  <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-2 sm:p-2.5">
-                    <Flame className="w-4 h-4 text-orange-400 mx-auto mb-1" />
-                    <div className="text-orange-400 font-bold text-base sm:text-lg">{game.dailyStreak}</div>
-                    <div className="text-slate-500 text-[10px]">Days</div>
+                  <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-2">
+                    <Flame className="w-4 h-4 text-orange-400 mx-auto mb-0.5" />
+                    <div className="text-orange-400 font-bold text-sm sm:text-base">{game.dailyStreak}</div>
+                    <div className="text-slate-500 text-[9px]">Days</div>
                   </div>
-                  <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-2 sm:p-2.5">
-                    <Target className="w-4 h-4 text-cyan-400 mx-auto mb-1" />
-                    <div className="text-cyan-400 font-bold text-base sm:text-lg">{loadedStats.totalTaps.toLocaleString()}</div>
-                    <div className="text-slate-500 text-[10px]">Taps</div>
+                  <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-2">
+                    <Target className="w-4 h-4 text-cyan-400 mx-auto mb-0.5" />
+                    <div className="text-cyan-400 font-bold text-sm sm:text-base">{loadedStats.totalTaps.toLocaleString()}</div>
+                    <div className="text-slate-500 text-[9px]">Taps</div>
                   </div>
-                  <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-2 sm:p-2.5">
-                    <Crown className="w-4 h-4 text-amber-300 mx-auto mb-1" />
-                    <div className="text-amber-300 font-bold text-base sm:text-lg">{loadedStats.prestige}</div>
-                    <div className="text-slate-500 text-[10px]">Prestige</div>
+                  <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-2">
+                    <Crown className="w-4 h-4 text-amber-300 mx-auto mb-0.5" />
+                    <div className="text-amber-300 font-bold text-sm sm:text-base">{loadedStats.prestige}</div>
+                    <div className="text-slate-500 text-[9px]">Prestige</div>
                   </div>
                 </div>
               )}
 
-              {/* Orb legend */}
-              <div className="flex flex-wrap gap-1 justify-center text-[10px] sm:text-[11px] text-slate-500 max-w-md mx-auto">
-                <span className="flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-full bg-slate-800/50 border border-slate-700"><span className="w-2.5 h-2.5 rounded-full bg-gradient-to-br from-cyan-400 to-blue-500" /> +10</span>
-                <span className="flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-full bg-slate-800/50 border border-slate-700"><Star className="w-2.5 h-2.5 text-amber-400" /> +100</span>
-                <span className="flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-full bg-slate-800/50 border border-slate-700"><Sparkles className="w-2.5 h-2.5 text-fuchsia-400" /> +50</span>
-                <span className="flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-full bg-slate-800/50 border border-slate-700"><Zap className="w-2.5 h-2.5 text-orange-400" /> Frenzy</span>
-                <span className="flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-full bg-slate-800/50 border border-slate-700"><HelpCircle className="w-2.5 h-2.5 text-violet-400" /> Mystery</span>
-                <span className="flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-full bg-slate-800/50 border border-slate-700"><Shield className="w-2.5 h-2.5 text-blue-400" /> Shield</span>
-                <span className="flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-full bg-slate-800/50 border border-slate-700"><TrendingUp className="w-2.5 h-2.5 text-green-400" /> Comeback</span>
-                <span className="flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-full bg-slate-800/50 border border-slate-700"><Rainbow className="w-2.5 h-2.5 text-pink-400" /> Rainbow</span>
-                <span className="flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-full bg-slate-800/50 border border-slate-700"><Swords className="w-2.5 h-2.5 text-red-400" /> Boss</span>
-                <span className="flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-full bg-slate-800/50 border border-slate-700"><Snowflake className="w-2.5 h-2.5 text-sky-400" /> Freeze</span>
-                <span className="flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-full bg-slate-800/50 border border-slate-700"><LinkIcon className="w-2.5 h-2.5 text-yellow-400" /> Chain</span>
-                <span className="flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-full bg-slate-800/50 border border-slate-700"><Ghost className="w-2.5 h-2.5 text-slate-300" /> Ghost</span>
-                <span className="flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-full bg-slate-800/50 border border-slate-700"><Gift className="w-2.5 h-2.5 text-amber-400" /> Treasure</span>
-                <span className="flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-full bg-slate-800/50 border border-slate-700"><span>💣</span> Avoid!</span>
-              </div>
+              {/* Orb legend — collapsible, compact */}
+              <details className="mt-3 text-left">
+                <summary className="text-slate-500 text-[10px] font-bold cursor-pointer hover:text-slate-400 select-none">Orb Guide</summary>
+                <div className="mt-1.5 flex flex-wrap gap-1 justify-center">
+                  <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-800/50 border border-slate-700 text-[10px] text-slate-400"><span className="w-2.5 h-2.5 rounded-full bg-gradient-to-br from-cyan-400 to-blue-500" /> +10</span>
+                  <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-800/50 border border-slate-700 text-[10px] text-slate-400"><Star className="w-2.5 h-2.5 text-amber-400" /> +100</span>
+                  <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-800/50 border border-slate-700 text-[10px] text-slate-400"><Sparkles className="w-2.5 h-2.5 text-fuchsia-400" /> +50</span>
+                  <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-800/50 border border-slate-700 text-[10px] text-slate-400"><Zap className="w-2.5 h-2.5 text-orange-400" /> Frenzy</span>
+                  <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-800/50 border border-slate-700 text-[10px] text-slate-400"><HelpCircle className="w-2.5 h-2.5 text-violet-400" /> Mystery</span>
+                  <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-800/50 border border-slate-700 text-[10px] text-slate-400"><Shield className="w-2.5 h-2.5 text-blue-400" /> Shield</span>
+                  <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-800/50 border border-slate-700 text-[10px] text-slate-400"><TrendingUp className="w-2.5 h-2.5 text-green-400" /> Comeback</span>
+                  <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-800/50 border border-slate-700 text-[10px] text-slate-400"><Rainbow className="w-2.5 h-2.5 text-pink-400" /> Rainbow</span>
+                  <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-800/50 border border-slate-700 text-[10px] text-slate-400"><Swords className="w-2.5 h-2.5 text-red-400" /> Boss</span>
+                  <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-800/50 border border-slate-700 text-[10px] text-slate-400"><Snowflake className="w-2.5 h-2.5 text-sky-400" /> Freeze</span>
+                  <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-800/50 border border-slate-700 text-[10px] text-slate-400"><LinkIcon className="w-2.5 h-2.5 text-yellow-400" /> Chain</span>
+                  <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-800/50 border border-slate-700 text-[10px] text-slate-400"><Ghost className="w-2.5 h-2.5 text-slate-300" /> Ghost</span>
+                  <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-800/50 border border-slate-700 text-[10px] text-slate-400"><Gift className="w-2.5 h-2.5 text-amber-400" /> Treasure</span>
+                  <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-800/50 border border-slate-700 text-[10px] text-slate-400"><span>💣</span> Avoid!</span>
+                </div>
+              </details>
             </div>
           </div>
         )}
 
         {/* GAME OVER SCREEN */}
         {game.gameState === "gameover" && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center z-20 bg-slate-950/60 backdrop-blur-sm overflow-y-auto py-6 px-4">
-            <div className="text-center w-full max-w-md mx-auto my-auto" style={{ animation: "slideUp 500ms ease-out" }}>
+          <div className="absolute inset-0 flex flex-col items-center justify-center z-20 bg-slate-950/60 backdrop-blur-sm overflow-y-auto py-4 px-4" style={{ WebkitOverflowScrolling: "touch" }}>
+            <div className="text-center w-full max-w-md mx-auto my-auto flex flex-col items-center" style={{ animation: "fadeIn 400ms ease-out" }}>
               {lossChaseActive && (
-                <div className="mb-3 inline-flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-2xl bg-orange-500/20 border-2 border-orange-400/50 text-orange-300 font-black text-sm sm:text-base" style={{ animation: "lossChaseGlow 1s ease-in-out infinite" }}>
+                <div className="mb-2 inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-orange-500/20 border-2 border-orange-400/50 text-orange-300 font-black text-sm" style={{ animation: "lossChaseGlow 1s ease-in-out infinite" }}>
                   <Timer className="w-5 h-5" />
                   {lossChase.reason} · {lossChase.secondsLeft}s
                 </div>
               )}
               {game.newRecord && game.score > 0 && (
-                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-300 font-bold text-xs sm:text-sm mb-2" style={{ animation: "pulseGlow 1s ease-in-out infinite" }}>
+                <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-300 font-bold text-xs mb-2" style={{ animation: "pulseGlow 1s ease-in-out infinite" }}>
                   <Crown className="w-4 h-4" /> NEW RECORD!
                 </div>
               )}
               {game.prestige > 0 && (loadedStats?.prestige ?? 0) < game.prestige && (
-                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-300 font-bold text-xs sm:text-sm mb-2">
-                  <Crown className="w-4 h-4" /> PRESTIGE {game.prestige}! +10% permanent
+                <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-300 font-bold text-xs mb-2">
+                  <Crown className="w-4 h-4" /> PRESTIGE {game.prestige}!
                 </div>
               )}
-              <h2 className="text-2xl sm:text-4xl font-black text-white mb-2">Game Over</h2>
+              <h2 className="text-2xl sm:text-4xl font-black text-white mb-1">Game Over</h2>
               <div className="text-4xl sm:text-6xl font-black text-cyan-400 mb-2" style={{ animation: "scoreBump 600ms ease-out" }}>{game.score.toLocaleString()}</div>
               {game.gems > 0 && (
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-fuchsia-500/15 border border-fuchsia-400/30 text-fuchsia-300 text-xs sm:text-sm font-bold mb-3">
-                  <Gem className="w-4 h-4" /> +{game.gems} gems earned!
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-fuchsia-500/15 border border-fuchsia-400/30 text-fuchsia-300 text-xs font-bold mb-2">
+                  <Gem className="w-4 h-4" /> +{game.gems} gems!
                 </div>
               )}
               {game.firstWinToday && (
-                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-300 text-xs sm:text-sm font-bold mb-2" style={{ animation: "firstWinPop 500ms ease-out" }}>
+                <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-300 text-xs font-bold mb-2" style={{ animation: "firstWinPop 500ms ease-out" }}>
                   <Star className="w-4 h-4" fill="currentColor" /> First win! +100 gems!
                 </div>
               )}
               {game.nearRecord && !game.newRecord && (
-                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-orange-500/15 border border-orange-400/40 text-orange-300 text-xs sm:text-sm font-bold mb-2" style={{ animation: "nudgeShake 0.5s ease-in-out 3" }}>
-                  <Trophy className="w-4 h-4" /> Only {game.recordGap.toLocaleString()} pts from the record!
+                <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-orange-500/15 border border-orange-400/40 text-orange-300 text-xs font-bold mb-2" style={{ animation: "nudgeShake 0.5s ease-in-out 3" }}>
+                  <Trophy className="w-4 h-4" /> Only {game.recordGap.toLocaleString()} pts from record!
                 </div>
               )}
               {game.sessionStreak > 1 && (
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-500/15 border border-cyan-400/30 text-cyan-300 text-xs sm:text-sm font-bold mb-3">
-                  <Flame className="w-4 h-4" fill="currentColor" /> {game.sessionStreak} in a row · {game.sessionMult.toFixed(1)}x bonus!
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-500/15 border border-cyan-400/30 text-cyan-300 text-xs font-bold mb-2">
+                  <Flame className="w-4 h-4" fill="currentColor" /> {game.sessionStreak}x · {game.sessionMult.toFixed(1)}x bonus!
                 </div>
               )}
-              <div className="grid grid-cols-3 gap-2 mb-5">
-                <div className="bg-slate-800/60 border border-slate-700 rounded-xl p-2.5 sm:p-3">
-                  <Flame className="w-4 h-4 text-orange-400 mx-auto mb-1" />
-                  <div className="text-orange-400 font-bold text-lg sm:text-xl">{game.bestCombo}</div>
+              <div className="grid grid-cols-3 gap-2 mb-4 w-full max-w-xs">
+                <div className="bg-slate-800/60 border border-slate-700 rounded-xl p-2.5">
+                  <Flame className="w-4 h-4 text-orange-400 mx-auto mb-0.5" />
+                  <div className="text-orange-400 font-bold text-lg">{game.bestCombo}</div>
                   <div className="text-slate-500 text-[10px]">Combo</div>
                 </div>
-                <div className="bg-slate-800/60 border border-slate-700 rounded-xl p-2.5 sm:p-3">
-                  <Trophy className="w-4 h-4 text-amber-400 mx-auto mb-1" />
-                  <div className="text-amber-400 font-bold text-lg sm:text-xl">Lv {game.level}</div>
+                <div className="bg-slate-800/60 border border-slate-700 rounded-xl p-2.5">
+                  <Trophy className="w-4 h-4 text-amber-400 mx-auto mb-0.5" />
+                  <div className="text-amber-400 font-bold text-lg">Lv {game.level}</div>
                   <div className="text-slate-500 text-[10px]">Level</div>
                 </div>
-                <div className="bg-slate-800/60 border border-slate-700 rounded-xl p-2.5 sm:p-3">
-                  <Star className="w-4 h-4 text-yellow-400 mx-auto mb-1" />
-                  <div className="text-yellow-400 font-bold text-lg sm:text-xl">{game.totalGolden}</div>
+                <div className="bg-slate-800/60 border border-slate-700 rounded-xl p-2.5">
+                  <Star className="w-4 h-4 text-yellow-400 mx-auto mb-0.5" />
+                  <div className="text-yellow-400 font-bold text-lg">{game.totalGolden}</div>
                   <div className="text-slate-500 text-[10px]">Golden</div>
                 </div>
               </div>
 
-              <button onClick={() => setModal("chest")} className="mb-2.5 w-full px-8 py-3 sm:py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold text-base sm:text-lg shadow-2xl shadow-amber-500/40 hover:scale-105 active:scale-95 transition-transform">
-                <span className="flex items-center justify-center gap-2"><Gift className="w-5 h-5" /> OPEN FREE CHEST</span>
-              </button>
-              {game.canRevive && game.score > 0 && (
-                <button onClick={game.revive} className="mb-2.5 w-full px-8 py-3 sm:py-3.5 rounded-2xl bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold text-base sm:text-lg shadow-2xl shadow-green-500/40 hover:scale-105 active:scale-95 transition-transform">
-                  <span className="flex items-center justify-center gap-2"><Heart className="w-5 h-5" fill="currentColor" /> REVIVE (1 life)</span>
+              <div className="w-full max-w-xs space-y-2">
+                <button onClick={() => setModal("chest")} className="w-full px-6 py-3 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold text-sm shadow-2xl shadow-amber-500/40 hover:scale-105 active:scale-95 transition-transform">
+                  <span className="flex items-center justify-center gap-2"><Gift className="w-5 h-5" /> OPEN FREE CHEST</span>
                 </button>
-              )}
-              <button onClick={handleStartGame} className={`group w-full px-10 py-3.5 sm:py-4 rounded-2xl text-white font-bold text-base sm:text-lg shadow-2xl hover:scale-105 active:scale-95 transition-transform mb-2.5 ${lossChaseActive ? "bg-gradient-to-r from-orange-500 to-red-600 shadow-orange-500/40" : "bg-gradient-to-r from-cyan-500 to-blue-600 shadow-cyan-500/40"}`}>
-                <span className="flex items-center justify-center gap-2"><RotateCcw className="w-5 h-5" /> {lossChaseActive ? `PLAY (${lossChase.multiplier}x BONUS!)` : !premium && lives <= 0 ? "GET LIVES" : "PLAY AGAIN"}</span>
-              </button>
-              <div className="flex gap-2">
-                <button onClick={() => setModal("leaderboard")} className="flex-1 px-4 py-2.5 sm:py-3 rounded-2xl bg-slate-800/60 border border-slate-700 text-slate-300 font-bold text-xs sm:text-sm hover:scale-105 active:scale-95 transition-transform">
-                  <span className="flex items-center justify-center gap-2"><Trophy className="w-5 h-5 text-amber-400" /> RANKS</span>
+                {game.canRevive && game.score > 0 && (
+                  <button onClick={game.revive} className="w-full px-6 py-3 rounded-2xl bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold text-sm shadow-2xl shadow-green-500/40 hover:scale-105 active:scale-95 transition-transform">
+                    <span className="flex items-center justify-center gap-2"><Heart className="w-5 h-5" fill="currentColor" /> REVIVE (1 life)</span>
+                  </button>
+                )}
+                <button onClick={handleStartGame} className={`w-full px-6 py-3.5 rounded-2xl text-white font-bold text-sm shadow-2xl hover:scale-105 active:scale-95 transition-transform ${lossChaseActive ? "bg-gradient-to-r from-orange-500 to-red-600 shadow-orange-500/40" : "bg-gradient-to-r from-cyan-500 to-blue-600 shadow-cyan-500/40"}`}>
+                  <span className="flex items-center justify-center gap-2"><RotateCcw className="w-5 h-5" /> {lossChaseActive ? `PLAY (${lossChase.multiplier}x BONUS!)` : !premium && lives <= 0 ? "GET LIVES" : "PLAY AGAIN"}</span>
                 </button>
-                <button onClick={handleGoHome} className="flex-1 px-4 py-2.5 sm:py-3 rounded-2xl bg-slate-800/40 border border-slate-700/60 text-slate-400 font-bold text-xs sm:text-sm hover:scale-105 active:scale-95 transition-transform">
-                  <span className="flex items-center justify-center gap-2"><Home className="w-5 h-5" /> HOME</span>
-                </button>
+                <div className="flex gap-2">
+                  <button onClick={() => setModal("leaderboard")} className="flex-1 px-4 py-2.5 rounded-2xl bg-slate-800/60 border border-slate-700 text-slate-300 font-bold text-xs hover:scale-105 active:scale-95 transition-transform">
+                    <span className="flex items-center justify-center gap-1.5"><Trophy className="w-4 h-4 text-amber-400" /> RANKS</span>
+                  </button>
+                  <button onClick={handleGoHome} className="flex-1 px-4 py-2.5 rounded-2xl bg-slate-800/40 border border-slate-700/60 text-slate-400 font-bold text-xs hover:scale-105 active:scale-95 transition-transform">
+                    <span className="flex items-center justify-center gap-1.5"><Home className="w-4 h-4" /> HOME</span>
+                  </button>
+                </div>
               </div>
               {game.autoRestartCountdown > 0 && (
                 <div className="mt-3 text-slate-400 text-sm">Restarting in <span className="text-cyan-400 font-bold" style={{ animation: "countdownPulse 1s ease-in-out infinite" }}>{game.autoRestartCountdown}</span>s</div>
