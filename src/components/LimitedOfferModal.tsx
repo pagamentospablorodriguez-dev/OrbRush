@@ -31,7 +31,7 @@ export function LimitedOfferModal({ open, onClose }: { open: boolean; onClose: (
   const secs = Math.floor((timeLeft % (1000 * 60)) / 1000);
 
   const handleBuy = () => {
-    window.open("https://buy.stripe.com/PLACEHOLDER_LEGENDARY_50OFF", "_blank");
+    window.open("https://buy.stripe.com/4gM6oHezL9nA6EX2jZb7y0j", "_blank");
   };
 
   const handleDismiss = () => {
