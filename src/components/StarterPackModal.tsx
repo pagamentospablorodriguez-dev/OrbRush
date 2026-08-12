@@ -29,7 +29,7 @@ export function StarterPackModal({ open, onClose }: { open: boolean; onClose: ()
   const secs = Math.floor((timeLeft % (1000 * 60)) / 1000);
 
   const handleBuy = () => {
-    window.open("https://buy.stripe.com/PLACEHOLDER_STARTER_PACK", "_blank");
+    window.open("https://buy.stripe.com/5kQbJ163f43g9R94s7b7y0i", "_blank");
   };
 
   const handleDismiss = () => {
