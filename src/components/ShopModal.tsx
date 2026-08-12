@@ -1,19 +1,28 @@
 import { useState, useEffect } from "react";
 import { Gem, Shield, X, ShoppingBag, Crown, Gift, CheckCircle2 } from "lucide-react";
 import { STRIPE_LINKS, getPendingChests, consumePendingChest } from "@/lib/monetization";
-import { rollChest, type ChestReward } from "@/lib/chest";
-import { addGems } from "@/lib/supabase";
-import { playChestReveal, playChestNearMiss } from "@/lib/sound";
+import { rollChestWithTease, type ChestReward, type ChestRarity, RARITY_ORDER } from "@/lib/chest";
+import { playChestTease, playChestReveal, playChestNearMiss } from "@/lib/sound";
 
-export function ShopModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+interface Props {
+  open: boolean;
+  onClose: () => void;
+  onGemsChange: (delta: number) => void;
+}
+
+export function ShopModal({ open, onClose, onGemsChange }: Props) {
   const [pendingChests, setPendingChests] = useState(getPendingChests());
   const [chestReward, setChestReward] = useState<ChestReward | null>(null);
   const [opening, setOpening] = useState(false);
+  const [teaseRarities, setTeaseRarities] = useState<ChestRarity[]>([]);
+  const [teaseIndex, setTeaseIndex] = useState(-1);
 
   useEffect(() => {
     if (open) {
       setPendingChests(getPendingChests());
       setChestReward(null);
+      setTeaseIndex(-1);
+      setTeaseRarities([]);
     }
   }, [open]);
 
@@ -23,17 +32,37 @@ export function ShopModal({ open, onClose }: { open: boolean; onClose: () => voi
     if (pendingChests[rarity] <= 0 || opening) return;
     setOpening(true);
     setChestReward(null);
-    setTimeout(() => {
-      const reward = rollChest();
-      consumePendingChest(rarity);
-      addGems(reward.gems);
-      setChestReward(reward);
-      setOpening(false);
-      setPendingChests(getPendingChests());
-      if (reward.rarity === "legendary" || reward.rarity === "mythic") playChestReveal();
-      else playChestNearMiss();
-    }, 800);
+    setTeaseIndex(-1);
+
+    const { reward, teaseSequence } = rollChestWithTease();
+    setTeaseRarities(teaseSequence);
+
+    let idx = 0;
+    const interval = setInterval(() => {
+      playChestTease();
+      setTeaseIndex(idx);
+      idx++;
+      if (idx >= teaseSequence.length) {
+        clearInterval(interval);
+        consumePendingChest(rarity);
+        onGemsChange(reward.gems);
+        setChestReward(reward);
+        setOpening(false);
+        setPendingChests(getPendingChests());
+        if (reward.rarity === "legendary" || reward.rarity === "mythic") playChestReveal();
+        else playChestNearMiss();
+      }
+    }, 150);
   };
+
+  const teaseColors: Record<ChestRarity, string> = {
+    common: "bg-slate-500", rare: "bg-blue-500", epic: "bg-fuchsia-500",
+    legendary: "bg-amber-500", mythic: "bg-rose-500",
+  };
+  const teaseTextColors = ["#94a3b8", "#3b82f6", "#d946ef", "#f59e0b", "#f43f5e"];
+  const teaseLabels = ["Common", "Rare", "Epic", "Legendary", "MYTHIC"];
+
+  const hasPending = pendingChests.legendary > 0 || pendingChests.mythic > 0;
 
   return (
     <div className="fixed inset-0 z-[120] bg-slate-950/90 backdrop-blur-xl flex items-center justify-center p-4 overflow-y-auto">
@@ -48,20 +77,44 @@ export function ShopModal({ open, onClose }: { open: boolean; onClose: () => voi
           <p className="text-slate-500 text-xs">Get gems and permanent power-ups</p>
         </div>
 
-        {pendingChests.legendary > 0 || pendingChests.mythic > 0 ? (
+        {/* Pending chests — shows even when 0 remaining if there's a reward to display */}
+        {(hasPending || chestReward) && (
           <div className="mb-4 p-4 rounded-2xl bg-amber-500/10 border-2 border-amber-400/40">
             <div className="flex items-center justify-center gap-2 mb-3">
               <Gift className="w-5 h-5 text-amber-400" />
               <span className="text-amber-300 font-black text-sm">PENDING CHESTS</span>
             </div>
+
+            {/* Tease display during opening */}
+            {opening && teaseRarities.length > 0 && (
+              <div className="mb-3">
+                <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                  {teaseRarities.map((r, i) => (
+                    <div
+                      key={i}
+                      className={`w-3 h-3 rounded-full transition-all ${
+                        i === teaseIndex ? `${teaseColors[r]} scale-150 shadow-lg` : "bg-slate-700"
+                      }`}
+                      style={i === teaseIndex ? { animation: "scoreBump 150ms ease-out" } : undefined}
+                    />
+                  ))}
+                </div>
+                {teaseIndex >= 0 && teaseIndex < teaseRarities.length && (
+                  <div className="mt-2 text-sm font-bold text-center" style={{ color: teaseTextColors[RARITY_ORDER.indexOf(teaseRarities[teaseIndex])] }}>
+                    {teaseLabels[RARITY_ORDER.indexOf(teaseRarities[teaseIndex])]}
+                  </div>
+                )}
+              </div>
+            )}
+
             {chestReward ? (
               <div className="text-center" style={{ animation: "modalIn 0.3s ease-out" }}>
                 <div className="text-4xl mb-2" style={{ animation: "chestBurst 0.5s ease-out" }}>{chestReward.rarity === "mythic" ? "🏆" : "💎"}</div>
                 <div className="mt-2 text-lg font-black text-white">{chestReward.label}!</div>
                 <div className="text-2xl font-black text-amber-400">+{chestReward.gems} gems</div>
-                <button onClick={() => setChestReward(null)} className="mt-3 px-6 py-2 rounded-xl bg-emerald-500 text-white font-bold text-sm">Continue</button>
+                <button onClick={() => { setChestReward(null); setTeaseRarities([]); }} className="mt-3 px-6 py-2 rounded-xl bg-emerald-500 text-white font-bold text-sm">Continue</button>
               </div>
-            ) : (
+            ) : !opening && (
               <div className="space-y-2">
                 {pendingChests.legendary > 0 && (
                   <button onClick={() => handleClaimChest("legendary")} disabled={opening} className="w-full py-2.5 bg-amber-500/20 border border-amber-400/40 rounded-xl text-amber-300 font-bold text-sm hover:bg-amber-500/30 transition-colors disabled:opacity-50">
@@ -76,7 +129,7 @@ export function ShopModal({ open, onClose }: { open: boolean; onClose: () => voi
               </div>
             )}
           </div>
-        ) : null}
+        )}
 
         <div className="space-y-3">
           <div className="text-[9px] font-black text-slate-600 uppercase tracking-[0.2em] pt-2 px-1">Gem Packs</div>
