@@ -327,7 +327,8 @@ export function useGame(callbacks: GameCallbacks) {
     const r = Math.random();
     let type: OrbType = "normal";
 
-    const goldenChance = luckyTimeRef.current ? 0.35 : 0.06 + lvl * 0.003;
+        const goldenChance = luckyTimeRef.current ? 0.35 : Math.min(0.06 + lvl * 0.003, 0.25);
+
     const bombChance = luckyTimeRef.current ? 0.02 : Math.min(0.04 + lvl * 0.005, 0.16);
     const bonusChance = 0.05;
     const frenzyChance = frenzyRef.current ? 0 : 0.01;
