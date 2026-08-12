@@ -32,7 +32,6 @@ export function TemptationOfferModal({ open, onClose }: TemptationOfferModalProp
     return () => clearInterval(timer);
   }, [open, onClose]);
 
-  // Poll for activation (when user returns from Stripe payment)
   useEffect(() => {
     if (!open || !loading) return;
     const checkInterval = setInterval(() => {
