@@ -3,7 +3,6 @@ import { checkMonetizationActivation } from "./monetization";
 const PREMIUM_KEY = "orbrush_premium";
 const DOUBLE_POINTS_KEY = "orbrush_2x_points";
 
-// Single universal activation code — same for everyone.
 export const UNIVERSAL_ACTIVATION_CODE = "ORBRUSH-VIP-2024";
 
 // Stripe checkout URL — $4.99 one-time purchase
@@ -37,7 +36,6 @@ export function setDoublePoints(value: boolean): void {
   } catch {}
 }
 
-// Check URL for activation code on load. If present and valid, activate.
 export function checkUrlActivation(): boolean {
   try {
     const url = new URL(window.location.href);
@@ -59,7 +57,6 @@ export function checkUrlActivation(): boolean {
       activated = true;
     }
 
-    // Processa códigos de monetização (gemas, shield, bundles, temptation, first offer)
     const monetizationResult = checkMonetizationActivation();
     if (monetizationResult) {
       url.searchParams.delete("activate");
