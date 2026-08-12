@@ -2,8 +2,7 @@ import { addGems } from "./supabase";
 
 // === STRIPE PAYMENT LINKS ===
 // Substitua cada placeholder pelo seu link de pagamento do Stripe.
-// No Stripe Dashboard: Products → Create product → Payment Link
-// Para cada link, configure o "After payment" redirect URL para a URL de ativação correspondente.
+
 export const STRIPE_LINKS = {
   TEMPTATION_OFFER: "https://buy.stripe.com/00w7sLfDP6bo8N58Inb7y0a",
   FIRST_GAME_OVER: "https://buy.stripe.com/6oU3cv9fr0R4fbtcYDb7y0b",
@@ -13,11 +12,11 @@ export const STRIPE_LINKS = {
   GEMS_5000: "https://buy.stripe.com/28E8wP9fr6bo6EX1fVb7y0f",
   SHIELD_PERM: "https://buy.stripe.com/fZu28r2R36bo4wP9Mrb7y0g",
   MYSTERY_BOX_UNLOCK: "https://buy.stripe.com/dRm7sL77jfLY1kDe2Hb7y0h",
+
 };
 
 // === ACTIVATION CODES ===
 // Estes códigos vão na URL: https://orbrush.fun/?activate=CODIGO
-// Configure cada um como "After payment" redirect URL no Stripe.
 export const ACTIVATION_CODES = {
   TEMPTATION: "temptation_2x",
   FIRST_OFFER: "first_offer_2x",
@@ -29,39 +28,29 @@ export const ACTIVATION_CODES = {
   GEMS_600_CHEST: "gems_600_chest",
   GEMS_1500_CHEST_SHIELD: "gems_1500_chest_shield",
   GEMS_5000_MYTHIC: "gems_5000_mythic",
+  SKIP_TIMER: "skip_timer",
 };
 
-// Gera a URL de ativação para um código (para configurar no Stripe)
-export function getActivationUrl(code: string): string {
-  const baseUrl = window.location.origin;
-  return `${baseUrl}/?activate=${code}`;
-}
-
-// Processa códigos de ativação na URL. NÃO limpa a URL (checkUrlActivation faz isso).
 export function checkMonetizationActivation(): string | null {
   const params = new URLSearchParams(window.location.search);
   const code = params.get("activate");
   if (!code) return null;
 
-  // 2x pontos para sempre (temptation offer + first game over offer)
   if (code === ACTIVATION_CODES.TEMPTATION || code === ACTIVATION_CODES.FIRST_OFFER) {
     localStorage.setItem("orbrush_2x_points", "true");
     return "2x_points";
   }
 
-  // Shield permanente
   if (code === ACTIVATION_CODES.SHIELD_PERM) {
     localStorage.setItem("orbrush_perm_shield", "true");
     return "perm_shield";
   }
 
-  // Pacotes de gemas simples
   if (code === ACTIVATION_CODES.ADD_100) { addGems(100); return "gems_100"; }
   if (code === ACTIVATION_CODES.ADD_600) { addGems(600); return "gems_600"; }
   if (code === ACTIVATION_CODES.ADD_1500) { addGems(1500); return "gems_1500"; }
   if (code === ACTIVATION_CODES.ADD_5000) { addGems(5000); return "gems_5000"; }
 
-  // Bundles com baús
   if (code === ACTIVATION_CODES.GEMS_600_CHEST) {
     addGems(600);
     addPendingChest("legendary", 1);
@@ -77,6 +66,11 @@ export function checkMonetizationActivation(): string | null {
     addGems(5000);
     addPendingChest("mythic", 1);
     return "gems_5000_mythic";
+  }
+
+  if (code === ACTIVATION_CODES.SKIP_TIMER) {
+    localStorage.setItem("orbrush_skip_timer", "true");
+    return "skip_timer";
   }
 
   return null;
@@ -101,6 +95,14 @@ export function consumePendingChest(rarity: "legendary" | "mythic"): boolean {
   if (current <= 0) return false;
   localStorage.setItem(key, String(current - 1));
   return true;
+}
+
+export function consumeSkipTimer(): boolean {
+  if (localStorage.getItem("orbrush_skip_timer") === "true") {
+    localStorage.removeItem("orbrush_skip_timer");
+    return true;
+  }
+  return false;
 }
 
 export function hasDoublePoints(): boolean {
