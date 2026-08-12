@@ -1,31 +1,37 @@
 import { useState } from "react";
 import { Gem, X, Crown, Sparkles, Gift } from "lucide-react";
 import { TIERED_CHESTS } from "@/lib/tieredChests";
-import { rollChest, type ChestReward } from "@/lib/chest";
-import { addGems } from "@/lib/supabase";
+import { rollChestWithTease, type ChestReward, type ChestRarity, RARITY_ORDER } from "@/lib/chest";
 import { playChestTease, playChestReveal, playChestNearMiss } from "@/lib/sound";
 
-interface Props { open: boolean; onClose: () => void; gems: number; }
+interface Props { open: boolean; onClose: () => void; gems: number; onGemsChange: (delta: number) => void; }
 
-export function TieredChestsModal({ open, onClose, gems }: Props) {
+export function TieredChestsModal({ open, onClose, gems, onGemsChange }: Props) {
   const [result, setResult] = useState<ChestReward | null>(null);
   const [opening, setOpening] = useState(false);
   const [openingId, setOpeningId] = useState<string | null>(null);
+  const [teaseRarities, setTeaseRarities] = useState<ChestRarity[]>([]);
+  const [teaseIndex, setTeaseIndex] = useState(-1);
 
   const handleBuy = (chest: any) => {
     if (gems < chest.cost || opening) return;
+    onGemsChange(-chest.cost);
     setOpening(true);
     setOpeningId(chest.id);
     setResult(null);
+    setTeaseIndex(-1);
 
-    let teaseCount = 0;
+    const { reward, teaseSequence } = rollChestWithTease();
+    setTeaseRarities(teaseSequence);
+
+    let idx = 0;
     const interval = setInterval(() => {
       playChestTease();
-      teaseCount++;
-      if (teaseCount >= 8) {
+      setTeaseIndex(idx);
+      idx++;
+      if (idx >= teaseSequence.length) {
         clearInterval(interval);
-        const reward = rollChest();
-        addGems(-chest.cost + reward.gems);
+        onGemsChange(reward.gems);
         setResult(reward);
         setOpening(false);
         setOpeningId(null);
@@ -36,6 +42,13 @@ export function TieredChestsModal({ open, onClose, gems }: Props) {
   };
 
   if (!open) return null;
+
+  const teaseColors: Record<ChestRarity, string> = {
+    common: "bg-slate-500", rare: "bg-blue-500", epic: "bg-fuchsia-500",
+    legendary: "bg-amber-500", mythic: "bg-rose-500",
+  };
+  const teaseTextColors = ["#94a3b8", "#3b82f6", "#d946ef", "#f59e0b", "#f43f5e"];
+  const teaseLabels = ["Common", "Rare", "Epic", "Legendary", "MYTHIC"];
 
   return (
     <div className="fixed inset-0 z-[100] bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
@@ -78,6 +91,28 @@ export function TieredChestsModal({ open, onClose, gems }: Props) {
             );
           })}
         </div>
+
+        {/* Near-miss tease display */}
+        {opening && teaseRarities.length > 0 && (
+          <div className="mt-4">
+            <div className="flex items-center justify-center gap-1.5 flex-wrap">
+              {teaseRarities.map((r, i) => (
+                <div
+                  key={i}
+                  className={`w-3 h-3 rounded-full transition-all ${
+                    i === teaseIndex ? `${teaseColors[r]} scale-150 shadow-lg` : "bg-slate-700"
+                  }`}
+                  style={i === teaseIndex ? { animation: "scoreBump 150ms ease-out" } : undefined}
+                />
+              ))}
+            </div>
+            {teaseIndex >= 0 && teaseIndex < teaseRarities.length && (
+              <div className="mt-2 text-sm font-bold text-center" style={{ color: teaseTextColors[RARITY_ORDER.indexOf(teaseRarities[teaseIndex])] }}>
+                {teaseLabels[RARITY_ORDER.indexOf(teaseRarities[teaseIndex])]}
+              </div>
+            )}
+          </div>
+        )}
 
         {result && (
           <div className="mt-6 p-4 rounded-2xl bg-emerald-500/10 border border-emerald-400/30 text-center" style={{ animation: "modalIn 0.3s ease-out" }}>
