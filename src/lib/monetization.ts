@@ -29,6 +29,8 @@ export const ACTIVATION_CODES = {
   GEMS_1500_CHEST_SHIELD: "gems_1500_chest_shield",
   GEMS_5000_MYTHIC: "gems_5000_mythic",
   SKIP_TIMER: "skip_timer",
+  STARTER_PACK: "starter_pack",
+  LEGENDARY_CHEST_50OFF: "legendary_chest_50off",
 };
 
 export function checkMonetizationActivation(): string | null {
@@ -71,6 +73,17 @@ export function checkMonetizationActivation(): string | null {
   if (code === ACTIVATION_CODES.SKIP_TIMER) {
     localStorage.setItem("orbrush_skip_timer", "true");
     return "skip_timer";
+  }
+
+  if (code === ACTIVATION_CODES.STARTER_PACK) {
+    addGems(300);
+    localStorage.setItem("orbrush_perm_shield", "true");
+    return "starter_pack";
+  }
+
+  if (code === ACTIVATION_CODES.LEGENDARY_CHEST_50OFF) {
+    addPendingChest("legendary", 1);
+    return "legendary_chest_50off";
   }
 
   return null;
