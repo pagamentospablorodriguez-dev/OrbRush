@@ -5,7 +5,6 @@ const DOUBLE_POINTS_KEY = "orbrush_2x_points";
 
 export const UNIVERSAL_ACTIVATION_CODE = "ORBRUSH-VIP-2024";
 
-// Stripe checkout URL — $4.99 one-time purchase
 export const STRIPE_CHECKOUT_URL = "https://buy.stripe.com/bJe6oH63f6bogfx8Inb7y09";
 
 export function isPremium(): boolean {
@@ -36,40 +35,47 @@ export function setDoublePoints(value: boolean): void {
   } catch {}
 }
 
-export function checkUrlActivation(): boolean {
+export function hasPermanentShield(): boolean {
+  try {
+    return localStorage.getItem("orbrush_perm_shield") === "true";
+  } catch {
+    return false;
+  }
+}
+
+export function checkUrlActivation(): string | null {
   try {
     const url = new URL(window.location.href);
     const code = url.searchParams.get("code");
     const activate = url.searchParams.get("activate");
     const pathname = url.pathname;
 
-    let activated = false;
+    let activationType: string | null = null;
 
     if (code && code.toUpperCase() === UNIVERSAL_ACTIVATION_CODE) {
       setPremium(true);
-      url.searchParams.delete("code");
-      activated = true;
+      activationType = "premium";
     }
 
     if (activate === "2x_points") {
       setDoublePoints(true);
-      url.searchParams.delete("activate");
-      activated = true;
+      activationType = "2x_points";
     }
 
     const monetizationResult = checkMonetizationActivation();
     if (monetizationResult) {
-      url.searchParams.delete("activate");
-      activated = true;
+      activationType = monetizationResult;
     }
 
-    if (activated) {
+    if (activationType) {
+      url.searchParams.delete("code");
+      url.searchParams.delete("activate");
       const cleanPath = pathname === "/activate" ? "/" : pathname;
       window.history.replaceState({}, "", url.origin + cleanPath + (url.searchParams.toString() ? "?" + url.searchParams.toString() : ""));
-      return true;
+      return activationType;
     }
   } catch {}
-  return false;
+  return null;
 }
 
 export async function activateWithCode(code: string): Promise<{ valid: boolean; message: string }> {
