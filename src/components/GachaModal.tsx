@@ -1,11 +1,17 @@
 import { useState } from "react";
-import { Sparkles, Gem, Swords, X } from "lucide-react";
+import { Gem, Swords, X } from "lucide-react";
 import { rollGacha, type GachaOrb } from "@/lib/gacha";
 import { playChestTease, playChestReveal } from "@/lib/sound";
 
-interface Props { open: boolean; onClose: () => void; gems: number; pity: number; onPull: (orb: GachaOrb, newPity: number) => void; onGemsUpdate: (newGems: number) => void; }
+interface Props {
+  open: boolean;
+  onClose: () => void;
+  gems: number;
+  pity: number;
+  onPull: (orb: GachaOrb, newPity: number) => void;
+}
 
-export function GachaModal({ open, onClose, gems, pity, onPull, onGemsUpdate }: Props) {
+export function GachaModal({ open, onClose, gems, pity, onPull }: Props) {
   const [rolling, setRolling] = useState(false);
   const [result, setResult] = useState<GachaOrb | null>(null);
 
@@ -13,7 +19,7 @@ export function GachaModal({ open, onClose, gems, pity, onPull, onGemsUpdate }: 
     if (gems < 100 || rolling) return;
     setRolling(true);
     setResult(null);
-    
+
     let count = 0;
     const interval = setInterval(() => {
       playChestTease();
@@ -24,7 +30,6 @@ export function GachaModal({ open, onClose, gems, pity, onPull, onGemsUpdate }: 
         setResult(orb);
         setRolling(false);
         playChestReveal();
-        onGemsUpdate(gems - 100); // ATUALIZA NA HORA
         onPull(orb, newPity);
       }
     }, 150);
@@ -38,10 +43,10 @@ export function GachaModal({ open, onClose, gems, pity, onPull, onGemsUpdate }: 
         <button onClick={onClose} className="absolute top-4 right-4 text-slate-500"><X className="w-6 h-6"/></button>
         <h2 className="text-2xl font-black text-white mb-1">Orb Summon</h2>
         <p className="text-slate-400 text-xs mb-6 italic">Summon permanent orbs for passive bonuses!</p>
-        
+
         <div className="relative h-48 flex items-center justify-center mb-6 bg-slate-800/30 rounded-2xl border border-slate-700/50">
           {rolling ? <div className="text-7xl animate-bounce">✨</div> : result ? (
-            <div className="animate-in zoom-in duration-300">
+            <div style={{ animation: "modalIn 0.3s ease-out" }}>
               <div className="text-7xl mb-2">{result.icon}</div>
               <div className={`font-black text-lg ${result.rarity === 'legendary' ? 'text-amber-400' : 'text-white'}`}>{result.name}</div>
               <div className="text-emerald-400 font-bold">+{result.bonus}% Points</div>
