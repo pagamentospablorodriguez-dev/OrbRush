@@ -48,8 +48,7 @@ export function ShopModal({ open, onClose }: { open: boolean; onClose: () => voi
           <p className="text-slate-500 text-xs">Get gems and permanent power-ups</p>
         </div>
 
-        {/* Pending chests from bundles */}
-        {(pendingChests.legendary > 0 || pendingChests.mythic > 0) && (
+        {pendingChests.legendary > 0 || pendingChests.mythic > 0 ? (
           <div className="mb-4 p-4 rounded-2xl bg-amber-500/10 border-2 border-amber-400/40">
             <div className="flex items-center justify-center gap-2 mb-3">
               <Gift className="w-5 h-5 text-amber-400" />
@@ -79,10 +78,9 @@ export function ShopModal({ open, onClose }: { open: boolean; onClose: () => voi
               </div>
             )}
           </div>
-        )}
+        ) : null}
 
         <div className="space-y-3">
-          {/* Gem Packs */}
           <div className="text-[9px] font-black text-slate-600 uppercase tracking-[0.2em] pt-2 px-1">Gem Packs</div>
 
           <button onClick={() => window.open(STRIPE_LINKS.GEMS_100, "_blank")} className="w-full p-4 bg-slate-800/50 border border-slate-700 rounded-2xl flex items-center justify-between hover:border-emerald-500/50 transition-all group">
@@ -117,7 +115,6 @@ export function ShopModal({ open, onClose }: { open: boolean; onClose: () => voi
             <div className="text-amber-300 font-black text-sm">$19.99</div>
           </button>
 
-          {/* Power-ups */}
           <div className="text-[9px] font-black text-slate-600 uppercase tracking-[0.2em] pt-2 px-1">Power-ups</div>
           <button onClick={() => window.open(STRIPE_LINKS.SHIELD_PERM, "_blank")} className="w-full p-4 bg-slate-800/50 border border-slate-700 rounded-2xl flex items-center justify-between hover:border-blue-500/50 transition-all group">
             <div className="flex items-center gap-3">
