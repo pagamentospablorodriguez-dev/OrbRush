@@ -8,6 +8,7 @@ interface Props {
   onClose: () => void;
   gems: number;
   pity: number;
+  onGemsChange: (delta: number) => void;
   onPull: (orb: GachaOrb, newPity: number) => void;
 }
 
@@ -32,7 +33,7 @@ const RARITY_BG: Record<OrbRarity, string> = {
   legendary: "from-amber-900 to-orange-950 border-amber-500/50",
 };
 
-export function GachaModal({ open, onClose, gems, pity, onPull }: Props) {
+export function GachaModal({ open, onClose, gems, pity, onGemsChange, onPull }: Props) {
   const [rolling, setRolling] = useState(false);
   const [result, setResult] = useState<GachaOrb | null>(null);
   const [teaseIndex, setTeaseIndex] = useState(-1);
@@ -40,6 +41,7 @@ export function GachaModal({ open, onClose, gems, pity, onPull }: Props) {
 
   const handlePull = () => {
     if (gems < 100 || rolling) return;
+    onGemsChange(-100);
     setRolling(true);
     setResult(null);
     setTeaseIndex(-1);
