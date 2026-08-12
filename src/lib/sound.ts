@@ -1,6 +1,7 @@
 let ctx: AudioContext | null = null;
 let muted = false;
 let droneNodes: { osc: OscillatorNode; gain: GainNode }[] = [];
+let silentAudioEl: HTMLAudioElement | null = null;
 
 function getCtx(): AudioContext | null {
   if (muted) return null;
@@ -353,14 +354,53 @@ export function playComboGrief() {
 // iOS Safari blocks all audio until the AudioContext is created/resumed
 // within a user gesture (tap/click). This function must be called from
 // a click/tap handler (e.g. handleStartGame, handleOrbTap).
+//
+// Additionally, iOS routes audio to the receiver (earpiece) by default
+// instead of the speaker. Playing a silent HTML <audio> element forces
+// iOS to route audio to the loudspeaker, making Web Audio API sounds
+// audible without headphones.
 export function unlockAudio() {
   try {
+    // 1. Create/resume the AudioContext within the user gesture
     if (!ctx) {
       ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
     }
     if (ctx.state === "suspended") {
       ctx.resume();
     }
+
+    // 2. Play a silent HTML audio element to force iOS to route audio
+    //    to the loudspeaker instead of the receiver (earpiece).
+    //    This is the key fix for "no sound on iPhone without headphones".
+    if (!silentAudioEl) {
+      // A tiny silent WAV (44100 Hz, 1 sample, 8-bit) encoded as a data URI.
+      // This is enough to make iOS switch the audio route to the speaker.
+      const SILENCE = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAAHAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==";
+      silentAudioEl = document.createElement("audio");
+      silentAudioEl.src = SILENCE;
+      silentAudioEl.loop = false;
+      silentAudioEl.volume = 0;
+      silentAudioEl.setAttribute("playsinline", "");
+      silentAudioEl.setAttribute("webkit-playsinline", "");
+      silentAudioEl.style.position = "fixed";
+      silentAudioEl.style.top = "-100px";
+      silentAudioEl.style.pointerEvents = "none";
+      document.body.appendChild(silentAudioEl);
+    }
+    // Play the silent audio to trigger the speaker route
+    const playPromise = silentAudioEl.play();
+    if (playPromise !== undefined) {
+      playPromise.then(() => {
+        // Immediately pause — the route switch has already happened
+        silentAudioEl!.pause();
+        silentAudioEl!.currentTime = 0;
+      }).catch(() => {
+        // Autoplay might be blocked — that's OK, the AudioContext unlock
+        // above will still work. The route fix applies on next play.
+      });
+    }
+
+    // 3. Also play a near-silent oscillator through the AudioContext
     if (ctx) {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
@@ -372,4 +412,3 @@ export function unlockAudio() {
     }
   } catch {}
 }
-
