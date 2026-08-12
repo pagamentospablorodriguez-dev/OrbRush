@@ -708,9 +708,9 @@ function App() {
                 </div>
               </div>
 
-              <img src="/Bune_Logo.png" alt="OrbRush" className="w-16 h-16 sm:w-20 sm:h-20 mb-1 object-contain drop-shadow-[0_0_15px_rgba(34,211,238,0.3)]" />
+              <img src="/Bune_Home.png" alt="OrbRush" className="w-16 h-16 sm:w-20 sm:h-20 mb-1 object-contain drop-shadow-[0_0_15px_rgba(34,211,238,0.3)]" />
 
-              <h1 className="text-xl sm:text-3xl font-black text-white mb-2 tracking-tight">ORBRUSH<span className="text-cyan-400">.FUN</span></h1>
+              <h1 className="text-xl sm:text-3xl font-black text-white mb-2 tracking-tight"><span className="text-cyan-400">ORB</span>RUSH<span className="text-purple-400">.FUN</span></h1>
 
               {!premium && (
                 <div className="mb-2 inline-flex items-center gap-2 px-3 sm:px-4 py-1.5 rounded-full bg-rose-500/15 border border-rose-400/30">
