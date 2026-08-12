@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
-import { Timer, Gem, X, Sparkles, Package, CheckCircle2, Loader2 } from "lucide-react";
-import { MYSTERY_BOX_COST, MYSTERY_BOX_DURATION, getRemainingTime, canOpen } from "@/lib/mysteryBox";
+import { Timer, Gem, X, Package, CheckCircle2, Loader2 } from "lucide-react";
+import { MYSTERY_BOX_COST, MYSTERY_BOX_DURATION, getRemainingTime } from "@/lib/mysteryBox";
 import { STRIPE_LINKS, consumeSkipTimer } from "@/lib/monetization";
 import { playChestTease, playChestReveal, playChestNearMiss } from "@/lib/sound";
-import { rollChestWithTease, rarityIndex } from "@/lib/chest";
-import { saveStats, addGems } from "@/lib/supabase";
+import { rollChestWithTease } from "@/lib/chest";
+import { addGems } from "@/lib/supabase";
 
 interface Props { open: boolean; onClose: () => void; }
 
@@ -31,7 +31,6 @@ export function MysteryBoxModal({ open, onClose }: Props) {
     return () => clearInterval(timer);
   }, [boxState]);
 
-  // Poll for skip timer activation when loading
   useEffect(() => {
     if (!open || !skipLoading) return;
     const checkInterval = setInterval(() => {
@@ -39,7 +38,6 @@ export function MysteryBoxModal({ open, onClose }: Props) {
         clearInterval(checkInterval);
         setSkipLoading(false);
         setSkipSuccess(true);
-        // Skip the timer — mark box as ready to open
         const newState = { isUnlocking: true, unlockStartTime: Date.now() - MYSTERY_BOX_DURATION, duration: MYSTERY_BOX_DURATION };
         setBoxState(newState);
         localStorage.setItem("orbrush_mystery_box", JSON.stringify(newState));
@@ -48,10 +46,7 @@ export function MysteryBoxModal({ open, onClose }: Props) {
       }
     }, 500);
     const timeout = setTimeout(() => clearInterval(checkInterval), 300000);
-    return () => {
-      clearInterval(checkInterval);
-      clearTimeout(timeout);
-    };
+    return () => { clearInterval(checkInterval); clearTimeout(timeout); };
   }, [open, skipLoading]);
 
   const handleBuy = () => {
@@ -92,14 +87,22 @@ export function MysteryBoxModal({ open, onClose }: Props) {
   const secs = Math.floor((timeLeft % (1000 * 60)) / 1000);
 
   return (
-    <div className="fixed inset-0 z-[100] bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4">
-      <div className="relative max-w-sm w-full bg-slate-900 border-2 border-amber-500/50 rounded-3xl p-8 text-center shadow-2xl">
-        <button onClick={onClose} className="absolute top-4 right-4 text-slate-500"><X className="w-6 h-6"/></button>
-        <h2 className="text-2xl font-black text-white mb-2">Mystery Box</h2>
+    <div className="fixed inset-0 z-[100] bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+      <div className="relative max-w-sm w-full my-auto bg-slate-900 border-2 border-amber-500/50 rounded-3xl p-8 text-center shadow-2xl">
+        <button onClick={onClose} className="absolute top-4 right-4 text-slate-500 hover:text-white z-10"><X className="w-6 h-6"/></button>
+
+        <div className="flex items-center justify-center gap-2 mb-1">
+          <Package className="w-6 h-6 text-amber-400" />
+          <h2 className="text-2xl font-black text-white">Mystery Box</h2>
+        </div>
         <p className="text-slate-400 text-sm mb-6">Unlock powerful rewards! Needs 2h to open.</p>
 
         <div className="w-32 h-32 mx-auto bg-slate-800 rounded-2xl flex items-center justify-center mb-6 border border-slate-700 relative overflow-hidden">
-          {opening ? <div className="text-6xl animate-bounce">📦</div> : <Package className={`w-16 h-16 ${boxState.isUnlocking ? 'text-amber-400' : 'text-slate-600'}`} />}
+          {opening ? (
+            <div className="text-6xl" style={{ animation: "chestShake 300ms ease-in-out infinite" }}>📦</div>
+          ) : (
+            <Package className={`w-16 h-16 ${boxState.isUnlocking ? 'text-amber-400' : 'text-slate-600'}`} />
+          )}
           {boxState.isUnlocking && timeLeft > 0 && (
             <div className="absolute inset-0 bg-slate-900/60 flex flex-col items-center justify-center backdrop-blur-sm">
               <Timer className="w-6 h-6 text-amber-400 mb-1" />
@@ -118,28 +121,21 @@ export function MysteryBoxModal({ open, onClose }: Props) {
           </div>
         ) : reward ? (
           <div className="mb-6" style={{ animation: "modalIn 0.3s ease-out" }}>
+            <div className="text-4xl mb-2" style={{ animation: "chestBurst 0.5s ease-out" }}>{reward.rarity === "mythic" ? "🏆" : "💎"}</div>
             <div className="text-amber-400 text-2xl font-black">+{reward.gems} GEMS!</div>
             <div className="text-slate-400 text-xs">{reward.rarity.toUpperCase()} REWARD</div>
           </div>
         ) : !boxState.isUnlocking ? (
-          <button onClick={handleBuy} className="w-full py-4 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-2xl flex items-center justify-center gap-2">
+          <button onClick={handleBuy} className="w-full py-4 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-2xl flex items-center justify-center gap-2 transition-transform active:scale-95">
             <Gem className="w-5 h-5" /> BUY FOR 50 GEMS
           </button>
         ) : timeLeft === 0 ? (
-          <button onClick={handleOpen} className="w-full py-4 bg-green-500 hover:bg-green-400 text-white font-black rounded-2xl animate-pulse">
+          <button onClick={handleOpen} className="w-full py-4 bg-green-500 hover:bg-green-400 text-white font-black rounded-2xl animate-pulse transition-transform active:scale-95">
             OPEN NOW!
           </button>
         ) : (
-          <button
-            onClick={handleSkipTimer}
-            disabled={skipLoading}
-            className="w-full py-4 bg-slate-800 text-white font-bold rounded-2xl border border-slate-700 disabled:opacity-50 flex items-center justify-center gap-2"
-          >
-            {skipLoading ? (
-              <><Loader2 className="w-5 h-5 animate-spin" /> Waiting for payment...</>
-            ) : (
-              <>SKIP TIMER ($0.99)</>
-            )}
+          <button onClick={handleSkipTimer} disabled={skipLoading} className="w-full py-4 bg-slate-800 text-white font-bold rounded-2xl border border-slate-700 disabled:opacity-50 flex items-center justify-center gap-2 transition-transform active:scale-95">
+            {skipLoading ? <><Loader2 className="w-5 h-5 animate-spin" /> Waiting...</> : <>SKIP TIMER ($0.99)</>}
           </button>
         )}
       </div>
