@@ -38,7 +38,7 @@ export function ShopModal({ open, onClose }: { open: boolean; onClose: () => voi
   return (
     <div className="fixed inset-0 z-[120] bg-slate-950/90 backdrop-blur-xl flex items-center justify-center p-4 overflow-y-auto">
       <div className="relative max-w-sm w-full my-auto bg-slate-900 border-2 border-emerald-500/30 rounded-3xl p-6 shadow-2xl">
-        <button onClick={onClose} className="absolute top-4 right-4 text-slate-500 hover:text-white"><X className="w-6 h-6"/></button>
+        <button onClick={onClose} className="absolute top-4 right-4 text-slate-500 hover:text-white z-10"><X className="w-6 h-6"/></button>
 
         <div className="text-center mb-6">
           <div className="w-16 h-16 bg-emerald-500/20 rounded-2xl flex items-center justify-center mx-auto mb-3 border border-emerald-500/20">
@@ -56,9 +56,7 @@ export function ShopModal({ open, onClose }: { open: boolean; onClose: () => voi
             </div>
             {chestReward ? (
               <div className="text-center" style={{ animation: "modalIn 0.3s ease-out" }}>
-                <div className={`mx-auto w-20 h-20 rounded-2xl bg-gradient-to-br ${chestReward.color} border-2 border-white/30 flex items-center justify-center shadow-2xl ${chestReward.glow}`} style={{ animation: "pulseGlow 1s infinite" }}>
-                  <Gem className="w-10 h-10 text-white" />
-                </div>
+                <div className="text-4xl mb-2" style={{ animation: "chestBurst 0.5s ease-out" }}>{chestReward.rarity === "mythic" ? "🏆" : "💎"}</div>
                 <div className="mt-2 text-lg font-black text-white">{chestReward.label}!</div>
                 <div className="text-2xl font-black text-amber-400">+{chestReward.gems} gems</div>
                 <button onClick={() => setChestReward(null)} className="mt-3 px-6 py-2 rounded-xl bg-emerald-500 text-white font-bold text-sm">Continue</button>
@@ -91,10 +89,11 @@ export function ShopModal({ open, onClose }: { open: boolean; onClose: () => voi
             <div className="text-white font-black text-sm">$0.99</div>
           </button>
 
-          <button onClick={() => window.open(STRIPE_LINKS.GEMS_600, "_blank")} className="w-full p-4 bg-slate-800/50 border border-slate-700 rounded-2xl flex items-center justify-between hover:border-emerald-500/50 transition-all group">
+          <button onClick={() => window.open(STRIPE_LINKS.GEMS_600, "_blank")} className="w-full p-4 bg-slate-800/50 border border-slate-700 rounded-2xl flex items-center justify-between hover:border-emerald-500/50 transition-all group relative">
+            <div className="absolute top-2 right-2 bg-amber-400 text-slate-950 text-[8px] font-black px-2 py-0.5 rounded-full">BEST VALUE</div>
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-emerald-500/20 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform"><Gem className="text-emerald-400 w-5 h-5"/></div>
-              <div className="text-left"><div className="text-white font-bold text-sm">600 Gems + 1 Legendary Chest</div><div className="text-[9px] text-amber-400 uppercase font-black">Best Value</div></div>
+              <div className="text-left"><div className="text-white font-bold text-sm">600 Gems + 1 Legendary Chest</div><div className="text-[9px] text-amber-400 uppercase font-black">Save 15%</div></div>
             </div>
             <div className="text-white font-black text-sm">$4.99</div>
           </button>
@@ -107,10 +106,11 @@ export function ShopModal({ open, onClose }: { open: boolean; onClose: () => voi
             <div className="text-white font-black text-sm">$9.99</div>
           </button>
 
-          <button onClick={() => window.open(STRIPE_LINKS.GEMS_5000, "_blank")} className="w-full p-4 bg-gradient-to-r from-amber-900/40 to-orange-900/40 border-2 border-amber-500/40 rounded-2xl flex items-center justify-between hover:border-amber-400/60 transition-all group">
+          <button onClick={() => window.open(STRIPE_LINKS.GEMS_5000, "_blank")} className="w-full p-4 bg-gradient-to-r from-amber-900/40 to-orange-900/40 border-2 border-amber-500/40 rounded-2xl flex items-center justify-between hover:border-amber-400/60 transition-all group relative">
+            <div className="absolute top-2 right-2 bg-rose-500 text-white text-[8px] font-black px-2 py-0.5 rounded-full">MEGA</div>
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-amber-500/20 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform"><Crown className="text-amber-400 w-5 h-5"/></div>
-              <div className="text-left"><div className="text-white font-bold text-sm">5000 Gems + Mythic Chest</div><div className="text-[9px] text-amber-400 uppercase font-black">Mega Pack</div></div>
+              <div className="text-left"><div className="text-white font-bold text-sm">5000 Gems + Mythic Chest</div><div className="text-[9px] text-amber-400 uppercase font-black">Best Deal — Save 20%</div></div>
             </div>
             <div className="text-amber-300 font-black text-sm">$19.99</div>
           </button>
