@@ -43,6 +43,9 @@ import { TieredChestsModal } from "@/components/TieredChestsModal";
 import { hasDoublePoints } from "@/lib/premium";
 import { type GachaOrb } from "@/lib/gacha";
 import { ShopModal } from "@/components/ShopModal";
+import { StarterPackModal } from "@/components/StarterPackModal";
+import { LimitedOfferModal } from "@/components/LimitedOfferModal";
+
 
 const ORB_COLORS: Record<string, { bg: string; border: string; glow: string }> = {
   normal: { bg: "from-cyan-400 to-blue-500", border: "border-cyan-300", glow: "shadow-cyan-400/50" },
@@ -122,6 +125,9 @@ function App() {
   const [gachaPity, setGachaPity] = useState(0);
   const [activationToast, setActivationToast] = useState<string | null>(null);
   const [pendingChestsCount, setPendingChestsCount] = useState(0);
+    const [showStarterPack, setShowStarterPack] = useState(false);
+  const [showLimitedOffer, setShowLimitedOffer] = useState(false);
+
 
   const shakeTimerRef = useRef<number | null>(null);
   const flashTimerRef = useRef<number | null>(null);
@@ -435,6 +441,24 @@ function App() {
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+
+
+    useEffect(() => {
+    const starterData = localStorage.getItem("orbrush_starter_pack");
+    if (!starterData) {
+      localStorage.setItem("orbrush_starter_pack", JSON.stringify({ startTime: Date.now(), status: "shown" }));
+      setTimeout(() => setShowStarterPack(true), 2000);
+    }
+
+    const lastOffer = localStorage.getItem("orbrush_limited_offer_last");
+    const cooldown = 2 * 60 * 60 * 1000;
+    if ((!lastOffer || Date.now() - parseInt(lastOffer) > cooldown) && Math.random() < 0.3) {
+      localStorage.setItem("orbrush_limited_offer", JSON.stringify({ startTime: Date.now() }));
+      setTimeout(() => setShowLimitedOffer(true), 4000);
+    }
+  }, []);
+
 
   const toggleMute = () => { const m = !muted; setMuted(m); setMutedState(m); };
 
@@ -1417,6 +1441,11 @@ function App() {
         currentDay={loginRewardDay}
         streakBroken={loginRewardStreakBroken}
       />
+
+      <StarterPackModal open={showStarterPack} onClose={() => setShowStarterPack(false)} />
+      <LimitedOfferModal open={showLimitedOffer} onClose={() => setShowLimitedOffer(false)} />
+
+      
     </div>
   );
 }
