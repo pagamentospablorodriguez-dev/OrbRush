@@ -349,3 +349,31 @@ export function playComboGrief() {
   tone(150, 0.4, "sawtooth", 0.12, 0.1, 80);
   noiseBurst(0.2, 0.08);
 }
+
+// --- iOS AUDIO UNLOCK ---
+// iOS Safari blocks all audio until the AudioContext is created/resumed
+// within a user gesture (tap/click). This function must be called from
+// a click/tap handler (e.g. handleStartGame, handleOrbTap).
+export function unlockAudio() {
+  if (muted) return;
+  if (!ctx) {
+    try {
+      ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    } catch {
+      return;
+    }
+  }
+  if (ctx && ctx.state === "suspended") {
+    ctx.resume();
+  }
+  // Play a silent buffer to fully unlock the audio pipeline on iOS
+  if (ctx && ctx.state === "running") {
+    try {
+      const buffer = ctx.createBuffer(1, 1, 22050);
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(ctx.destination);
+      source.start(0);
+    } catch {}
+  }
+}
