@@ -15,7 +15,6 @@ export function FirstGameOverOfferModal({ open, onClose }: Props) {
     setLoading(false);
   }, [open]);
 
-  // Poll for activation (when user returns from Stripe payment)
   useEffect(() => {
     if (!open || !loading) return;
     const checkInterval = setInterval(() => {
