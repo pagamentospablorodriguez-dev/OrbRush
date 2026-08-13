@@ -359,9 +359,12 @@ export function playComboGrief() {
 // instead of the speaker. Playing a silent HTML <audio> element forces
 // iOS to route audio to the loudspeaker, making Web Audio API sounds
 // audible without headphones.
+// --- iOS AUDIO UNLOCK ---
+let silentVideoEl: HTMLVideoElement | null = null;
+let iosSessionUnlocked = false;
+
 export function unlockAudio() {
   try {
-    // 1. Create/resume the AudioContext within the user gesture
     if (!ctx) {
       ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
     }
@@ -369,12 +372,8 @@ export function unlockAudio() {
       ctx.resume();
     }
 
-    // 2. Play a silent HTML audio element to force iOS to route audio
-    //    to the loudspeaker instead of the receiver (earpiece).
-    //    This is the key fix for "no sound on iPhone without headphones".
+    // 1. Silent HTML <audio> — mantém o truque antigo (não faz mal manter)
     if (!silentAudioEl) {
-      // A tiny silent WAV (44100 Hz, 1 sample, 8-bit) encoded as a data URI.
-      // This is enough to make iOS switch the audio route to the speaker.
       const SILENCE = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAAHAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==";
       silentAudioEl = document.createElement("audio");
       silentAudioEl.src = SILENCE;
@@ -387,20 +386,46 @@ export function unlockAudio() {
       silentAudioEl.style.pointerEvents = "none";
       document.body.appendChild(silentAudioEl);
     }
-    // Play the silent audio to trigger the speaker route
-    const playPromise = silentAudioEl.play();
-    if (playPromise !== undefined) {
-      playPromise.then(() => {
-        // Immediately pause — the route switch has already happened
-        silentAudioEl!.pause();
-        silentAudioEl!.currentTime = 0;
-      }).catch(() => {
-        // Autoplay might be blocked — that's OK, the AudioContext unlock
-        // above will still work. The route fix applies on next play.
-      });
+    const p1 = silentAudioEl.play();
+    if (p1 !== undefined) {
+      p1.then(() => { silentAudioEl!.pause(); silentAudioEl!.currentTime = 0; }).catch(() => {});
     }
 
-    // 3. Also play a near-silent oscillator through the AudioContext
+    // 2. O TRUQUE DE VERDADE: um <video> tocando um tom quase inaudível
+    //    gerado via Web Audio. iOS trata <video> como categoria
+    //    "MediaPlayback", que IGNORA a chavinha física de silêncio.
+    //    Precisa nascer dentro do gesto do usuário (clique/toque).
+    if (!iosSessionUnlocked && ctx) {
+      const dest = ctx.createMediaStreamDestination();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      gain.gain.value = 0.0001; // praticamente inaudível, mas precisa ser > 0
+      osc.frequency.value = 20; // infrassom, imperceptível
+      osc.connect(gain);
+      gain.connect(dest);
+      osc.start();
+
+      silentVideoEl = document.createElement("video");
+      (silentVideoEl as any).srcObject = dest.stream;
+      silentVideoEl.muted = false;
+      silentVideoEl.volume = 0.01;
+      silentVideoEl.loop = true;
+      silentVideoEl.setAttribute("playsinline", "");
+      silentVideoEl.setAttribute("webkit-playsinline", "");
+      silentVideoEl.style.position = "fixed";
+      silentVideoEl.style.width = "1px";
+      silentVideoEl.style.height = "1px";
+      silentVideoEl.style.opacity = "0";
+      silentVideoEl.style.pointerEvents = "none";
+      document.body.appendChild(silentVideoEl);
+
+      const p2 = silentVideoEl.play();
+      if (p2 !== undefined) {
+        p2.then(() => { iosSessionUnlocked = true; }).catch(() => {});
+      }
+    }
+
+    // 3. Osciloscópio quase silencioso pra manter o contexto "quente"
     if (ctx) {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
